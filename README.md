@@ -1,123 +1,127 @@
 # Lovable Clone — Backend
 
-A Spring Boot backend that replicates the core architecture of [Lovable](https://lovable.dev), the AI-powered web-app builder. This project models the full domain — users, projects, AI chat, live previews, and subscription billing — as a foundation for building an end-to-end AI code-generation platform.
+Spring Boot API that mirrors the core ideas behind [Lovable](https://lovable.dev): AI-assisted projects, collaboration, files, previews, usage tracking, and Stripe-style billing. This repo is a **work in progress**: HTTP layer and domain types are in place; persistence and auth need to be wired up.
 
 ## Tech Stack
 
-| Layer       | Technology             |
-|-------------|------------------------|
-| Language    | Java 21                |
-| Framework   | Spring Boot 4.0.4      |
-| Web         | Spring Web MVC         |
-| Persistence | Spring Data JPA        |
-| Database    | PostgreSQL             |
-| Build       | Maven (with wrapper)   |
-| Utilities   | Lombok                 |
+| Layer       | Technology           |
+|------------|------------------------|
+| Language   | Java 21                |
+| Framework  | Spring Boot 4.0.4      |
+| Web        | Spring Web MVC         |
+| Persistence| Spring Data JPA        |
+| Database   | PostgreSQL (planned)   |
+| Build      | Maven + wrapper        |
+| Utilities  | Lombok                 |
 
-## Domain Model
+## Features (current)
+
+- **REST controllers** for auth, projects, project members, files, billing/plans/subscription, and usage.
+- **DTOs** for requests and responses under `dto/`.
+- **Service interfaces** defining business operations (`service/`); implementations are not committed yet.
+- **Domain model** under `entity/` and `enums/` (`User`, `Plan`, and others as Plain Old Java Objects; JPA mapping is partial — see below).
+
+## API Overview
+
+Base URL (local default): `http://localhost:8080`
+
+| Area | Method | Path |
+|------|--------|------|
+| Auth | `POST` | `/api/auth/signup` |
+| Auth | `POST` | `/api/auth/login` |
+| Auth | `GET` | `/api/auth/me` |
+| Projects | `GET` | `/api/projects` |
+| Projects | `GET` | `/api/projects/{id}` |
+| Projects | `POST` | `/api/projects` |
+| Projects | `PATCH` | `/api/projects/{id}` |
+| Projects | `DELETE` | `/api/projects/{id}` |
+| Members | `GET` | `/api/projects/{projectId}/members` |
+| Members | `POST` | `/api/projects/{projectId}/members` |
+| Members | `PATCH` | `/api/projects/{projectId}/members/{memberId}` |
+| Members | `DELETE` | `/api/projects/{projectId}/members/{memberId}` |
+| Files | `GET` | `/api/projects/{projectId}/files` |
+| Files | `GET` | `/api/projects/{projectId}/files/{*path}` |
+| Plans | `GET` | `/api/plans` |
+| Subscription | `GET` | `/api/me/subscription` |
+| Stripe (stub) | `POST` | `/api/stripe/checkout` |
+| Stripe (stub) | `POST` | `/api/stripe/portal` |
+| Usage | `GET` | `/api/usage/today` |
+| Usage | `GET` | `/api/usage/limits` |
+
+> **Note:** Endpoints expect service implementations and a configured database. Many handlers currently use a placeholder user id until authentication is added.
+
+## Domain Model (conceptual)
 
 ```
 User ──< Project ──< ProjectFile
               │
               ├──< ProjectMember (EDITOR / VIEWER)
-              │
-              ├──< ChatSession ──< ChatMessage (USER / ASSISTANT / SYSTEM / TOOL)
-              │
-              ├──< Preview (CREATING / RUNNING / FAILED / TERMINATED)
-              │
+              ├──< ChatSession ──< ChatMessage
+              ├──< Preview
               └──< UsageLog
 
 Plan ──< Subscription ──> User
 ```
 
-### Key Entities
-
-| Entity           | Purpose                                                        |
-|------------------|----------------------------------------------------------------|
-| **User**         | Authentication, profile, soft-delete support                   |
-| **Project**      | Workspace with visibility settings, owned by a user            |
-| **ProjectFile**  | Files stored in MinIO (object-key reference)                   |
-| **ProjectMember**| Role-based collaboration (Editor / Viewer)                     |
-| **ChatSession**  | Per-project AI conversation thread                             |
-| **ChatMessage**  | Individual messages with role, token counts, and tool-call IDs |
-| **Preview**      | Live deployment preview (namespace, pod, URL)                  |
-| **Subscription** | Stripe-backed billing tied to a plan                           |
-| **Plan**         | Defines limits — max projects, tokens/day, previews, AI access |
-| **UsageLog**     | Tracks actions, token usage, and duration                      |
-
 ## Prerequisites
 
-- **Java 21** or later
-- **Maven 3.9+** (or use the included `mvnw` wrapper)
-- **PostgreSQL** instance running and accessible
+- **Java 21**
+- **Maven** (or `./mvnw` / `mvnw.cmd`)
+- **PostgreSQL** when you enable JPA against a real database
 
-## Getting Started
+## Configuration
 
-1. **Clone the repository**
+Add datasource and JPA settings to `src/main/resources/application.yml`, for example:
 
-   ```bash
-   git clone https://github.com/Snehil208001/Lovable_Clone.git
-   cd Lovable_Clone
-   ```
+```yaml
+spring:
+  application:
+    name: lovable-clone
+  datasource:
+    url: jdbc:postgresql://localhost:5432/lovable_clone
+    username: your_username
+    password: your_password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+```
 
-2. **Configure the database**
+## Build & run
 
-   Update `src/main/resources/application.yml` with your PostgreSQL connection details:
+```bash
+# Windows
+mvnw.cmd spring-boot:run
 
-   ```yaml
-   spring:
-     datasource:
-       url: jdbc:postgresql://localhost:5432/lovable_clone
-       username: your_username
-       password: your_password
-     jpa:
-       hibernate:
-         ddl-auto: update
-   ```
+# macOS / Linux
+./mvnw spring-boot:run
+```
 
-3. **Build and run**
-
-   ```bash
-   ./mvnw spring-boot:run
-   ```
-
-   The application will start on `http://localhost:8080`.
-
-## Project Structure
+## Project layout
 
 ```
 src/main/java/com/snehil/project/lovable_clone/
-├── LovableCloneApplication.java      # Entry point
-├── entity/                            # JPA entities
-│   ├── User.java
-│   ├── Project.java
-│   ├── ProjectFile.java
-│   ├── ProjectMember.java
-│   ├── ProjectMemberId.java
-│   ├── ChatSession.java
-│   ├── ChatMessage.java
-│   ├── Preview.java
-│   ├── Subscription.java
-│   ├── Plan.java
-│   └── UsageLog.java
-└── enums/
-    ├── MessageRole.java
-    ├── PreviewStatus.java
-    ├── ProjectRole.java
-    └── SubscriptionStatus.java
+├── LovableCloneApplication.java
+├── controller/          # REST endpoints
+├── dto/                 # Records for API payloads
+├── entity/             # Domain types (JPA mapping incomplete)
+├── enums/
+└── service/             # Service interfaces (implementations TBD)
 ```
 
 ## Roadmap
 
-- [ ] Repository & service layers
-- [ ] REST API controllers
-- [ ] Authentication & authorization (Spring Security + JWT)
-- [ ] AI chat integration (OpenAI / Anthropic)
-- [ ] MinIO file storage integration
-- [ ] Kubernetes-based preview deployments
-- [ ] Stripe billing webhooks
-- [ ] WebSocket support for real-time chat
+- [ ] Service implementations + Spring beans
+- [ ] Repositories and full JPA mapping for all entities
+- [ ] Spring Security + JWT (replace placeholder user id)
+- [ ] Stripe integration and webhooks
+- [ ] MinIO / object storage for project files
+- [ ] AI chat providers and preview/runtime integration
+
+## Repository
+
+- **GitHub:** [github.com/Snehil208001/Lovable_Clone](https://github.com/Snehil208001/Lovable_Clone)
 
 ## License
 
-This project is for educational and personal use.
+Educational and personal use.
