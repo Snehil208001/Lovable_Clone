@@ -1,29 +1,34 @@
 # Lovable Clone — Backend
 
-Spring Boot API that mirrors the core ideas behind [Lovable](https://lovable.dev): AI-assisted projects, collaboration, files, previews, usage tracking, and Stripe-style billing. This repo is a **work in progress**: HTTP layer and domain types are in place; persistence and auth need to be wired up.
+Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaboration, files, billing-style endpoints, and usage. Built with **Java 21**, **Spring Boot 4**, **PostgreSQL**, **JPA**, **MapStruct**, and REST controllers under `/api`.
 
-## Tech Stack
+## Tech stack
 
-| Layer       | Technology           |
-|------------|------------------------|
-| Language   | Java 21                |
-| Framework  | Spring Boot 4.0.4      |
-| Web        | Spring Web MVC         |
-| Persistence| Spring Data JPA        |
-| Database   | PostgreSQL (planned)   |
-| Build      | Maven + wrapper        |
-| Utilities  | Lombok                 |
+| Layer | Technology |
+|--------|------------|
+| Language | Java 21 |
+| Framework | Spring Boot 4.0.4 |
+| Web | Spring Web MVC |
+| Data | Spring Data JPA |
+| DB | PostgreSQL |
+| Mapping | MapStruct |
+| Build | Maven (wrapper included) |
+| Other | Lombok |
 
-## Features (current)
+## What’s in the repo
 
-- **REST controllers** for auth, projects, project members, files, billing/plans/subscription, and usage.
-- **DTOs** for requests and responses under `dto/`.
-- **Service interfaces** defining business operations (`service/`); implementations are not committed yet.
-- **Domain model** under `entity/` and `enums/` (`User`, `Plan`, and others as Plain Old Java Objects; JPA mapping is partial — see below).
+- **REST API** — auth, projects, members, files, plans, subscription/checkout stubs, usage.
+- **DTOs** — request/response records under `dto/`.
+- **Entities & enums** — domain model under `entity/` and `enums/`.
+- **Repositories** — `UserRepository`, `ProjectRepository`.
+- **Services** — interfaces in `service/` with implementations in `service/impl/`.
+- **Mappers** — e.g. `ProjectMapper` (MapStruct).
 
-## API Overview
+Configure the database in `src/main/resources/application.yml` (URL, user, password). Use your own credentials locally and avoid committing production secrets.
 
-Base URL (local default): `http://localhost:8080`
+## API overview
+
+Base URL (local): `http://localhost:8080`
 
 | Area | Method | Path |
 |------|--------|------|
@@ -43,14 +48,12 @@ Base URL (local default): `http://localhost:8080`
 | Files | `GET` | `/api/projects/{projectId}/files/{*path}` |
 | Plans | `GET` | `/api/plans` |
 | Subscription | `GET` | `/api/me/subscription` |
-| Stripe (stub) | `POST` | `/api/stripe/checkout` |
-| Stripe (stub) | `POST` | `/api/stripe/portal` |
+| Billing | `POST` | `/api/stripe/checkout` |
+| Billing | `POST` | `/api/stripe/portal` |
 | Usage | `GET` | `/api/usage/today` |
 | Usage | `GET` | `/api/usage/limits` |
 
-> **Note:** Endpoints expect service implementations and a configured database. Many handlers currently use a placeholder user id until authentication is added.
-
-## Domain Model (conceptual)
+## Domain model (conceptual)
 
 ```
 User ──< Project ──< ProjectFile
@@ -65,29 +68,29 @@ Plan ──< Subscription ──> User
 
 ## Prerequisites
 
-- **Java 21**
-- **Maven** (or `./mvnw` / `mvnw.cmd`)
-- **PostgreSQL** when you enable JPA against a real database
+- Java 21  
+- Maven or `./mvnw` / `mvnw.cmd`  
+- PostgreSQL (e.g. Docker on `localhost:9000` → container `5432`)
 
 ## Configuration
 
-Add datasource and JPA settings to `src/main/resources/application.yml`, for example:
+Example `application.yml` shape (adjust host, port, database name, and credentials):
 
 ```yaml
 spring:
   application:
     name: lovable-clone
   datasource:
-    url: jdbc:postgresql://localhost:5432/lovable_clone
+    url: jdbc:postgresql://localhost:9000/your_database
     username: your_username
     password: your_password
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: false
 ```
 
-## Build & run
+## Run
 
 ```bash
 # Windows
@@ -102,25 +105,26 @@ mvnw.cmd spring-boot:run
 ```
 src/main/java/com/snehil/project/lovable_clone/
 ├── LovableCloneApplication.java
-├── controller/          # REST endpoints
-├── dto/                 # Records for API payloads
-├── entity/             # Domain types (JPA mapping incomplete)
+├── controller/
+├── dto/
+├── entity/
 ├── enums/
-└── service/             # Service interfaces (implementations TBD)
+├── mapper/
+├── repository/
+└── service/
+    └── impl/
 ```
 
 ## Roadmap
 
-- [ ] Service implementations + Spring beans
-- [ ] Repositories and full JPA mapping for all entities
-- [ ] Spring Security + JWT (replace placeholder user id)
-- [ ] Stripe integration and webhooks
-- [ ] MinIO / object storage for project files
-- [ ] AI chat providers and preview/runtime integration
+- Spring Security + JWT (replace placeholder user id in controllers)
+- Stripe integration and webhooks
+- File storage (e.g. MinIO) and preview/runtime integration
+- Broader test coverage
 
 ## Repository
 
-- **GitHub:** [github.com/Snehil208001/Lovable_Clone](https://github.com/Snehil208001/Lovable_Clone)
+**GitHub:** [github.com/Snehil208001/Lovable_Clone](https://github.com/Snehil208001/Lovable_Clone)
 
 ## License
 
