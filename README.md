@@ -117,11 +117,13 @@ src/main/java/com/snehil/project/lovable_clone/
 
 ## Next steps
 
-- [ ] Orientation & Spring Boot project setup
+*Checked against the current codebase: Spring Boot app is running; `ProjectServiceImpl` + `ProjectMapper` + `ProjectRepository`/`UserRepository` persist projects; other services are mostly stubs (`null` / empty lists).*
+
+- [x] Orientation & Spring Boot project setup
 - [ ] Requirement gathering & system design (Lovable Clone)
-- [ ] Entity classes for Lovable Clone
-- [ ] REST API endpoints for Lovable Clone
-- [ ] MapStruct & `ProjectService`
+- [x] Entity classes for Lovable Clone
+- [x] REST API endpoints for Lovable Clone
+- [x] MapStruct & `ProjectService`
 - [ ] Project member management
 - [ ] Exception handling, code cleanup & Spring Security
 - [ ] JWT authentication
