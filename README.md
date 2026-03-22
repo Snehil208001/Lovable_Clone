@@ -236,7 +236,7 @@ src/main/java/com/snehil/project/lovable_clone/
 | Chat & AI | `.../chat-sessions`, messages, `POST /api/chat/stream` (SSE) | **Not implemented** |
 | Preview & runner | `POST .../preview`, preview status, logs SSE, `DELETE .../preview` | **Not implemented** |
 
-### Course / platform roadmap (optional follow-up)
+### Future work
 
 - [x] Orientation & Spring Boot project setup
 - [x] Entity classes & REST scaffolding
@@ -244,7 +244,7 @@ src/main/java/com/snehil/project/lovable_clone/
 - [ ] Project member management (full implementation)
 - [ ] Exception handling, Spring Security & JWT
 - [ ] Stripe integration & webhooks
-- [ ] AI, MinIO, previews, K8s, distributed architecture *(see project backlog)*
+- [ ] AI, MinIO, previews, K8s, distributed architecture
 
 ---
 
