@@ -115,12 +115,35 @@ src/main/java/com/snehil/project/lovable_clone/
     └── impl/
 ```
 
-## Roadmap
+## TODO
 
-- Spring Security + JWT (replace placeholder user id in controllers)
-- Stripe integration and webhooks
-- File storage (e.g. MinIO) and preview/runtime integration
-- Broader test coverage
+- [ ] **Module 1** — Orientation Class for Spring Boot Cohort 4.0
+- [ ] **Module 1** — Requirement Gathering & System Design of Lovable Clone
+- [ ] **Module 2** — Creating the Entity Classes for the Lovable Clone
+- [ ] **Module 2** — Defining the REST API Endpoints for the Lovable Clone
+- [ ] **Module 3** — MapStruct and ProjectService added in Lovable Clone
+- [ ] **Module 3** — Project Member Management in Lovable Clone
+- [ ] **Module 4** — Exception Handling, Code Clean up and Spring Security
+- [ ] **Module 4** — Added JWT Authentication in Lovable Clone Project
+- [ ] **Module 5** — Security Methods and Authorization in Lovable Clone Project
+- [ ] **Module 5** — Stripe Payments Integration in Lovable Clone Project
+- [ ] **Module 6** — Stripe Webhook Handler Part 1 for Lovable Clone Project
+- [ ] **Module 6** — Stripe Webhook Handlers Part 2 for Lovable Clone Project
+- [ ] **Module 7** — AI Code Generation System Architecture & Setup
+- [ ] **Module 8** — AI Code Generation and MinIO Setup in Lovable Clone Project
+- [ ] **Module 9** — Tool Calling and File Tree Advisor in Lovable Clone Project
+- [ ] **Module 9** — AI Chat Events Added in Lovable Clone Project
+- [ ] **Module 10** — System Architecture Design of AI Code Execution
+- [ ] **Module 11** — Frontend App Integration with the Lovable Clone Project
+- [ ] **Module 12** — Setup Kubernetes to build the Code Execution environment
+- [ ] **Module 12** — Reverse proxy to handle Preview URLs in Lovable Clone
+- [ ] **Module 13** — Distributed Lovable Clone Architecture and Setup
+- [ ] **Module 14** — Setup Account Service, API Gateway and Workspace
+- [ ] **Module 14** — Added Intelligence Service and Workspace Service
+- [ ] **Module 15** — Added Kafka and SAGA Design Pattern in Distributed Systems
+- [ ] **Module 16** — Setup Kubernetes Configuration for Distributed Systems
+- [ ] **Module 17** — Deploy Kubernetes Cluster on Google Kubernetes Engine (GKE)
+- [ ] **Module 18** — Added GitHub Workflows for CI/CD in Distributed Systems
 
 ## Repository
 
