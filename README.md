@@ -26,6 +26,65 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 
 Configure the database in `src/main/resources/application.yml` (URL, user, password). Use your own credentials locally and avoid committing production secrets.
 
+## Completed work (explained)
+
+This section describes **what is actually implemented end-to-end** today—not only REST routes, but persistence and behavior where applicable.
+
+### 1. Application & configuration
+
+- **Spring Boot 4** application (`LovableCloneApplication`) with **`spring-boot-starter-webmvc`** and **`spring-boot-starter-data-jpa`**.
+- **PostgreSQL** via JDBC URL, username, and password in **`application.yml`** (adjust for your environment).
+- **Hibernate** with `ddl-auto: update` so tables for mapped entities are created/updated against your database.
+- **Lombok** + **MapStruct** (annotation processors configured in `pom.xml`).
+
+### 2. JPA domain model (partial)
+
+- **`User`** — `@Entity` mapped to table `users` (id, email, password hash, name, avatar, timestamps, soft-delete field `deletedAt`).
+- **`Project`** — `@Entity` mapped to `projects` with **`@ManyToOne`** owner → `User`, name, public flag, **`@CreationTimestamp` / `@UpdateTimestamp`**, and **soft delete** via `deletedAt`.
+- Other classes under `entity/` (e.g. chat, preview, plan) exist as domain shapes; **only `User` and `Project` are fully wired as JPA entities** used in the implemented flow.
+
+### 3. Repositories
+
+- **`UserRepository`** — `JpaRepository<User, Long>` for loading owners by id.
+- **`ProjectRepository`** — `JpaRepository<Project, Long>` plus a custom **`@Query`**: **`findAllAccessibleByUser(userId)`** returns non-deleted projects owned by that user, ordered by `updatedAt` descending.
+
+### 4. Mapping layer
+
+- **`ProjectMapper` (MapStruct, `componentModel = "spring"`)** maps **`Project`** → **`ProjectResponse`** and **`ProjectSummaryResponse`**, and lists for listing APIs.
+
+### 5. Project service (fully implemented vertical)
+
+**`ProjectServiceImpl`** is **`@Transactional`** and uses the repositories + mapper to:
+
+| Operation | Behavior |
+|-----------|----------|
+| **Create** | Loads `User` by id, builds `Project` (name, owner, default visibility), **saves** to DB, returns **`ProjectResponse`**. |
+| **List** | Uses **`findAllAccessibleByUser`** → mapped list of summaries. |
+| **Get by id** | Loads project only if **owned by** `userId` and **not** soft-deleted; else throws (currently `RuntimeException`). |
+| **Update** | Same access check, updates name, **saves**. |
+| **Soft delete** | Sets **`deletedAt`** to now and **saves**. |
+
+Access control is **owner-based** (no shared-editor model in this service yet).
+
+### 6. HTTP API for projects
+
+**`ProjectController`** exposes:
+
+- `GET /api/projects` — list (passes a fixed `userId` in code today; replace with auth later).
+- `GET /api/projects/{id}` — get one project.
+- `POST /api/projects` — create.
+- `PATCH /api/projects/{id}` — update.
+- `DELETE /api/projects/{id}` — soft delete.
+
+So **project CRUD + list** is the **only feature area** where **controllers → service → mapper → DB** is fully exercised.
+
+### 7. What exists but is not “done” yet
+
+- **Auth, members, files, plans, subscription, Stripe, usage** — **controllers and DTOs exist**, but the corresponding **`service/impl`** classes mostly return **`null`** or **empty lists** (placeholders until you implement business logic and extra entities).
+- **Chat, preview, ZIP download, SSE streams** — **not implemented** (no controllers for those spec paths yet).
+
+---
+
 ## API overview
 
 Base URL (local): `http://localhost:8080`
@@ -188,8 +247,6 @@ src/main/java/com/snehil/project/lovable_clone/
 - [ ] AI, MinIO, previews, K8s, distributed architecture *(see project backlog)*
 
 ---
-
-*Implementation note: `ProjectServiceImpl` is the main completed vertical; most other services return `null` or empty lists until built out.*
 
 ## Repository
 
