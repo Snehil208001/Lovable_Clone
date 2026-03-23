@@ -3,7 +3,6 @@ package com.snehil.project.lovable_clone.controller;
 import com.snehil.project.lovable_clone.dto.member.InviteMemberRequest;
 import com.snehil.project.lovable_clone.dto.member.MemberResponse;
 import com.snehil.project.lovable_clone.dto.member.UpdateMemberRoleRequest;
-import com.snehil.project.lovable_clone.entity.ProjectMember;
 import com.snehil.project.lovable_clone.service.ProjectMemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -47,12 +46,13 @@ public class ProjectMemberController {
     }
 
     @DeleteMapping("/{memberId}")
-    public ResponseEntity<MemberResponse> deleteMember(
+    public ResponseEntity<Void> removeMember(
             @PathVariable Long projectId,
             @PathVariable Long memberId
     ) {
         Long userId = 1L;
-        return ResponseEntity.ok((projectMemberService.DeleteProjectMember(projectId,memberId,userId)));
+        projectMemberService.removeProjectMember(projectId,memberId,userId);
+        return ResponseEntity.noContent().build();
     }
 
 }
