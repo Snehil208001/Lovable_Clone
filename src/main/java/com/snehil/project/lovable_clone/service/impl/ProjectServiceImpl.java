@@ -92,17 +92,7 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     private Project getProjectIfAccessibleAndNotDeleted(Long projectId, Long userId) {
-        Project project = projectRepository.findById(projectId)
+        return projectRepository.findAccessibleProjectById(projectId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project", projectId.toString()));
-
-        if (project.getDeletedAt() != null) {
-            throw new RuntimeException("Project not found");
-        }
-
-        // Verify access through ProjectMember table instead of project.getOwner()
-        projectMemberRepository.findById(new ProjectMemberId(projectId, userId))
-                .orElseThrow(() -> new RuntimeException("Access denied"));
-
-        return project;
     }
 }

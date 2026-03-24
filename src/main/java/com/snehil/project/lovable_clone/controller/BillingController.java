@@ -2,10 +2,12 @@ package com.snehil.project.lovable_clone.controller;
 
 
 import com.snehil.project.lovable_clone.dto.subscriptions.*;
+import com.snehil.project.lovable_clone.security.JwtUserPrincipal;
 import com.snehil.project.lovable_clone.service.PlanService;
 import com.snehil.project.lovable_clone.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,22 +25,22 @@ public class BillingController {
     }
 
     @GetMapping("/api/me/subscription")
-    public ResponseEntity<SubscriptionResponse> getMySubscription() {
-        Long userId = 1L;
-        return ResponseEntity.ok(subscriptionService.getCurrentSubscription(userId));
+    public ResponseEntity<SubscriptionResponse> getMySubscription(
+            @AuthenticationPrincipal JwtUserPrincipal currentUser) {
+        return ResponseEntity.ok(subscriptionService.getCurrentSubscription(currentUser.userId()));
     }
 
     @PostMapping("/api/stripe/checkout")
     public ResponseEntity<CheckoutResponse> createCheckoutResponse(
-            @RequestBody CheckoutRequest request
+            @RequestBody CheckoutRequest request,
+            @AuthenticationPrincipal JwtUserPrincipal currentUser
     ) {
-        Long userId = 1L;
-        return ResponseEntity.ok(subscriptionService.createCheckoutSessionUrl(request,userId));
+        return ResponseEntity.ok(subscriptionService.createCheckoutSessionUrl(request, currentUser.userId()));
     }
 
     @PostMapping("/api/stripe/portal")
-    public ResponseEntity<PostalResponse> openCustomerPortal() {
-        Long userId = 1L;
-        return ResponseEntity.ok(subscriptionService.openCustomerPortal(userId));
+    public ResponseEntity<PostalResponse> openCustomerPortal(
+            @AuthenticationPrincipal JwtUserPrincipal currentUser) {
+        return ResponseEntity.ok(subscriptionService.openCustomerPortal(currentUser.userId()));
     }
 }

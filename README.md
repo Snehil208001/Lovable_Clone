@@ -11,7 +11,7 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 | Web | Spring Web MVC |
 | Data | Spring Data JPA |
 | DB | PostgreSQL |
-| Security | Spring Security (password hashing; JWT not wired yet) |
+| Security | Spring Security + JWT (`Authorization: Bearer …`) |
 | Validation | Bean Validation (`spring-boot-starter-validation`) |
 | Mapping | MapStruct |
 | Build | Maven (wrapper included) |
@@ -26,7 +26,7 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 - **Services** — interfaces in `service/` with implementations in `service/impl/`.
 - **Mappers** — `ProjectMapper`, `ProjectMemberMapper`, `UserMapper` (MapStruct).
 - **Errors** — `GlobalExceptionHandler`, `ApiError`, custom exceptions under `error/`.
-- **Security** — `WebSecurityConfig` (filter chain, `PasswordEncoder`).
+- **Security** — `WebSecurityConfig`, `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`.
 
 Configure the database in `src/main/resources/application.yml` (URL, user, password). Use your own credentials locally and avoid committing production secrets.
 
@@ -41,11 +41,11 @@ This section describes **what is actually implemented end-to-end** today—not o
 - **Hibernate** with `ddl-auto: update` so tables for mapped entities are created/updated against your database.
 - **Lombok** + **MapStruct** (annotation processors configured in `pom.xml`).
 
-#### Security (`security/WebSecurityConfig`)
+#### Security (`security/`)
 
-- **Stateless** HTTP sessions (`SessionCreationPolicy.STATELESS`), **CSRF disabled** (typical for API-first usage before JWT cookies).
-- **`/api/**` is `permitAll`** for now — there is **no JWT filter yet**; controllers still use a **hard-coded `userId`** until authentication is wired through the security context.
-- **`BCryptPasswordEncoder`** bean for **password hashing** (used on signup).
+- **Stateless** HTTP sessions (`SessionCreationPolicy.STATELESS`), **CSRF disabled** (API + Bearer tokens).
+- **`POST /api/auth/signup`** and **`POST /api/auth/login`** are **public** (`permitAll`). **Every other `/api/**` route** (including **`GET /api/auth/me`**) requires a valid **`Authorization: Bearer <JWT>`**; **`JwtAuthFilter`** validates the token and sets **`JwtUserPrincipal`**. Controllers use **`@AuthenticationPrincipal JwtUserPrincipal`** (user id from token claims).
+- **`BCryptPasswordEncoder`** for **password hashing** (signup and login).
 
 #### API errors (`error/` + `GlobalExceptionHandler`)
 
@@ -62,7 +62,9 @@ This section describes **what is actually implemented end-to-end** today—not o
 ### 3. Repositories
 
 - **`UserRepository`** — `JpaRepository<User, Long>` plus **`findByUsername`** (signup uniqueness, invitations).
-- **`ProjectRepository`** — `JpaRepository<Project, Long>` plus queries for listing and lookup (see code for current JPQL).
+- **`ProjectRepository`** — `JpaRepository<Project, Long>` with:
+  - **`findAllAccessibleByUser(userId)`** — lists **non-deleted** projects where the user has a **`project_members`** row: `INNER JOIN ProjectMember` on composite id (`projectId`, `userId`), plus an **`EXISTS`** guard on the same membership, **`DISTINCT`**, ordered by **`updatedAt`** descending.
+  - **`findAccessibleProjectById(projectId, userId)`** — returns **`Optional<Project>`** only when the project exists, **`deletedAt` is null**, and the user is a member (same join + **`EXISTS`** pattern). Used by **`ProjectServiceImpl`** for get/update/delete so access rules stay in the repository layer.
 - **`ProjectMemberRepository`** — `JpaRepository<ProjectMember, ProjectMemberId>` for membership rows (invite, list, update role, delete).
 
 ### 4. Mapping layer
@@ -71,10 +73,10 @@ This section describes **what is actually implemented end-to-end** today—not o
 - **`ProjectMapper`** — **`Project`** → **`ProjectResponse`** / **`ProjectSummaryResponse`** (and lists); **`owner`** on **`ProjectResponse`** is currently **ignored** in MapStruct — extend mapping if the API should return an owner object.
 - **`ProjectMemberMapper`** — **`ProjectMember`** → **`MemberResponse`**.
 
-### 5. Authentication (partial)
+### 5. Authentication
 
-- **`AuthServiceImpl`** — **`signup`**: checks **unique username**, maps **`SignupRequest`** → **`User`**, **BCrypt-hashes** password, **saves** user, returns **`AuthResponse`** with a **placeholder** token string and profile (real **JWT** not implemented yet). **`login`** is still **not implemented** (`null`).
-- **`UserServiceImpl.getProfile`** — still **not implemented** for real data.
+- **`AuthServiceImpl`** — **`signup`** and **`login`**: validate credentials, **JWT access token** via **`AuthUtil`**, **`AuthResponse`** includes token + profile.
+- **`UserServiceImpl.getProfile`** — loads **`User`** by id and returns **`UserProfileResponse`** (used by **`GET /api/auth/me`** with the authenticated principal).
 
 ### 6. Project service (fully implemented vertical)
 
@@ -83,8 +85,8 @@ This section describes **what is actually implemented end-to-end** today—not o
 | Operation | Behavior |
 |-----------|----------|
 | **Create** | Loads **`User`** by id, **saves** a new **`Project`**, then creates a **`ProjectMember`** row with role **`OWNER`** for that user (membership-based access). Returns **`ProjectResponse`**. |
-| **List** | Uses **`findAllAccessibleByUser`** → mapped list of **`ProjectSummaryResponse`**. |
-| **Get / update / soft-delete** | Loads project, ensures **not** deleted, and ensures the **`userId` has a `ProjectMember` row** for that project; otherwise access is denied. Uses **`ResourceNotFoundException`** when the project id does not exist. |
+| **List** | Uses **`ProjectRepository.findAllAccessibleByUser`** → mapped list of **`ProjectSummaryResponse`**. |
+| **Get / update / soft-delete** | Uses **`ProjectRepository.findAccessibleProjectById`** (membership + not soft-deleted). If empty, throws **`ResourceNotFoundException`** (same response shape for unknown id, deleted project, or non-member). |
 
 Access is **membership-based** via **`ProjectMember`**, not a denormalized `owner` field on **`Project`**.
 
@@ -103,7 +105,7 @@ Access is **membership-based** via **`ProjectMember`**, not a denormalized `owne
 
 **`ProjectController`** exposes:
 
-- `GET /api/projects` — list (passes a fixed `userId` in code today; replace with auth later).
+- `GET /api/projects` — list projects for the **authenticated** user (JWT).
 - `GET /api/projects/{id}` — get one project.
 - `POST /api/projects` — create.
 - `PATCH /api/projects/{id}` — update.
@@ -118,12 +120,11 @@ Access is **membership-based** via **`ProjectMember`**, not a denormalized `owne
 - `PATCH /api/projects/{projectId}/members/{memberId}` — change role.
 - `DELETE /api/projects/{projectId}/members/{memberId}` — remove member (or leave project).
 
-**Projects** and **project members** are the main areas where **controllers → service → mapper → DB** are wired end-to-end. **Signup** persists users; **login / profile** are still incomplete.
+**Projects** and **project members** are the main areas where **controllers → service → mapper → DB** are wired end-to-end. **Auth** issues JWTs; protected routes use **`@AuthenticationPrincipal`**.
 
 ### 10. What exists but is not “done” yet
 
-- **Login, profile, files, plans, subscription, Stripe, usage** — **controllers and DTOs exist**; several **`service/impl`** methods still return **`null`** or **empty lists**.
-- **JWT / real tokens** and **securing `userId` from the security context** — not wired yet (`/api/**` permitAll).
+- **Files, subscription, Stripe, usage** — **controllers and DTOs exist**; several **`service/impl`** methods still return **`null`** or **empty lists**.
 - **Chat, preview, ZIP download, SSE streams** — **not implemented** (no controllers for those spec paths yet).
 
 ---
@@ -235,9 +236,9 @@ src/main/java/com/snehil/project/lovable_clone/
 
 **Auth**
 
-- [ ] Login *(route: `POST /api/auth/login`)*
-- [x] Sign up *(route: `POST /api/auth/signup` — persists user + BCrypt; placeholder token)*
-- [ ] Get my profile *(route: `GET /api/auth/me`)*
+- [x] Login *(route: `POST /api/auth/login` — JWT + `UserDetailsService`)*
+- [x] Sign up *(route: `POST /api/auth/signup` — persists user + BCrypt + JWT)*
+- [x] Get my profile *(route: `GET /api/auth/me` — requires Bearer token)*
 
 **AI code generation**
 
@@ -271,7 +272,7 @@ src/main/java/com/snehil/project/lovable_clone/
 
 | Area | Spec | In codebase |
 |------|------|-------------|
-| Auth | `POST /api/auth/login`, `POST /api/auth/signup`, `GET /api/auth/me` | Signup persists user + hash · login & profile still stubbed |
+| Auth | `POST /api/auth/login`, `POST /api/auth/signup`, `GET /api/auth/me` | JWT auth; signup/login/me implemented |
 | Projects | CRUD `/api/projects/{id}`, `GET /api/projects` | Yes (projects CRUD + list) |
 | Files | Tree, file by path, `GET .../download-zip` | Tree + path routes · stubs · **no** download-zip |
 | Members | `GET/POST/PATCH/DELETE` `/api/projects/{id}/members...` | Yes (persistence + rules) |
@@ -287,7 +288,7 @@ src/main/java/com/snehil/project/lovable_clone/
 - [x] MapStruct & `ProjectService`
 - [x] Project member management
 - [x] Global exception handling & validation errors *(see `GlobalExceptionHandler`)*
-- [x] Spring Security baseline *(password encoder, stateless sessions; **JWT filter** still TODO)*
+- [x] Spring Security + JWT *(password encoder, `JwtAuthFilter`, protected `/api/**` except auth)*
 - [ ] Stripe integration & webhooks
 - [ ] AI, MinIO, previews, K8s, distributed architecture
 

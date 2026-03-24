@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -40,6 +42,22 @@ public class GlobalExceptionHandler {
 
         ApiError apiError = new ApiError(HttpStatus.BAD_REQUEST,"Input Validation Failed", errors);
         log.error(apiError.toString(),ex);
+        return ResponseEntity.status(apiError.status()).body(apiError);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiError> handleAuthentication(AuthenticationException ex) {
+        String message = ex.getMessage() != null ? ex.getMessage() : "Authentication failed";
+        ApiError apiError = new ApiError(HttpStatus.UNAUTHORIZED, message);
+        log.warn("Authentication: {}", message);
+        return ResponseEntity.status(apiError.status()).body(apiError);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
+        String message = ex.getMessage() != null ? ex.getMessage() : "Access denied";
+        ApiError apiError = new ApiError(HttpStatus.FORBIDDEN, message);
+        log.warn("Access denied: {}", message);
         return ResponseEntity.status(apiError.status()).body(apiError);
     }
 
