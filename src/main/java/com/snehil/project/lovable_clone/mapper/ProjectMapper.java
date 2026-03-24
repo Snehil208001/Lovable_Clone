@@ -11,9 +11,10 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface ProjectMapper {
 
+    @Mapping(target = "owner", ignore = true)
     ProjectResponse toProjectResponse(Project project);
 
-    @Mapping(source = "name",target = "projectName")
+    @Mapping(source = "name", target = "projectName")
     ProjectSummaryResponse toProjectSummaryResponse(Project project);
 
     List<ProjectSummaryResponse> toListOfProjectSummaryResponse(List<Project> projects);

@@ -11,6 +11,8 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 | Web | Spring Web MVC |
 | Data | Spring Data JPA |
 | DB | PostgreSQL |
+| Security | Spring Security (password hashing; JWT not wired yet) |
+| Validation | Bean Validation (`spring-boot-starter-validation`) |
 | Mapping | MapStruct |
 | Build | Maven (wrapper included) |
 | Other | Lombok |
@@ -18,11 +20,13 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 ## What’s in the repo
 
 - **REST API** — auth, projects, members, files, plans, subscription/checkout stubs, usage.
-- **DTOs** — request/response records under `dto/`.
+- **DTOs** — request/response records under `dto/` (with validation annotations where used).
 - **Entities & enums** — domain model under `entity/` and `enums/`.
 - **Repositories** — `UserRepository`, `ProjectRepository`, `ProjectMemberRepository`.
 - **Services** — interfaces in `service/` with implementations in `service/impl/`.
-- **Mappers** — `ProjectMapper`, `ProjectMemberMapper` (MapStruct).
+- **Mappers** — `ProjectMapper`, `ProjectMemberMapper`, `UserMapper` (MapStruct).
+- **Errors** — `GlobalExceptionHandler`, `ApiError`, custom exceptions under `error/`.
+- **Security** — `WebSecurityConfig` (filter chain, `PasswordEncoder`).
 
 Configure the database in `src/main/resources/application.yml` (URL, user, password). Use your own credentials locally and avoid committing production secrets.
 
@@ -32,55 +36,70 @@ This section describes **what is actually implemented end-to-end** today—not o
 
 ### 1. Application & configuration
 
-- **Spring Boot 4** application (`LovableCloneApplication`) with **`spring-boot-starter-webmvc`** and **`spring-boot-starter-data-jpa`**.
+- **Spring Boot 4** application (`LovableCloneApplication`) with **`spring-boot-starter-webmvc`**, **`spring-boot-starter-data-jpa`**, **`spring-boot-starter-security`**, and **`spring-boot-starter-validation`**.
 - **PostgreSQL** via JDBC URL, username, and password in **`application.yml`** (adjust for your environment).
 - **Hibernate** with `ddl-auto: update` so tables for mapped entities are created/updated against your database.
 - **Lombok** + **MapStruct** (annotation processors configured in `pom.xml`).
 
+#### Security (`security/WebSecurityConfig`)
+
+- **Stateless** HTTP sessions (`SessionCreationPolicy.STATELESS`), **CSRF disabled** (typical for API-first usage before JWT cookies).
+- **`/api/**` is `permitAll`** for now — there is **no JWT filter yet**; controllers still use a **hard-coded `userId`** until authentication is wired through the security context.
+- **`BCryptPasswordEncoder`** bean for **password hashing** (used on signup).
+
+#### API errors (`error/` + `GlobalExceptionHandler`)
+
+- **`@RestControllerAdvice`** centralizes errors into an **`ApiError`** JSON payload.
+- Handles **`BadRequestException`**, **`ResourceNotFoundException`**, **`MethodArgumentNotValidException`** (field errors), malformed JSON, unsupported HTTP methods, **`DataIntegrityViolationException`** (e.g. conflicts), plus a generic fallback for uncaught exceptions.
+
 ### 2. JPA domain model (partial)
 
-- **`User`** — `@Entity` mapped to table `users` (id, email, password hash, name, avatar, timestamps, soft-delete field `deletedAt`).
-- **`Project`** — `@Entity` mapped to `projects` with **`@ManyToOne`** owner → `User`, name, public flag, **`@CreationTimestamp` / `@UpdateTimestamp`**, and **soft delete** via `deletedAt`.
-- **`ProjectMember`** — `@Entity` with **`@EmbeddedId` `ProjectMemberId`** (composite `projectId` + `userId`), **`@ManyToOne`** links to `Project` and `User`, **`ProjectRole`** enum, invite/accept timestamps.
+- **`User`** — `@Entity` on table `users`: id, **`username`**, **password** (stored **BCrypt-hashed**), name, timestamps, optional soft-delete `deletedAt`.
+- **`Project`** — `@Entity` on `projects`: id, name, visibility, timestamps, soft-delete; **no `owner` column** — ownership and roles live in **`ProjectMember`** (including **`OWNER`**).
+- **`ProjectMember`** — `@Entity` with **`@EmbeddedId` `ProjectMemberId`**, links to **`Project`** and **`User`**, **`ProjectRole`** (`OWNER`, `EDITOR`, `VIEWER`), invite/accept times.
 - Other classes under `entity/` (e.g. chat, preview, plan) exist as domain shapes; **not all are mapped or used in live flows yet.**
 
 ### 3. Repositories
 
-- **`UserRepository`** — `JpaRepository<User, Long>` plus **`findByEmail`** for invitations.
-- **`ProjectRepository`** — `JpaRepository<Project, Long>` plus **`findAllAccessibleByUser(userId)`** (non-deleted projects owned by that user, ordered by `updatedAt` descending).
+- **`UserRepository`** — `JpaRepository<User, Long>` plus **`findByUsername`** (signup uniqueness, invitations).
+- **`ProjectRepository`** — `JpaRepository<Project, Long>` plus queries for listing and lookup (see code for current JPQL).
 - **`ProjectMemberRepository`** — `JpaRepository<ProjectMember, ProjectMemberId>` for membership rows (invite, list, update role, delete).
 
 ### 4. Mapping layer
 
-- **`ProjectMapper`** — **`Project`** → **`ProjectResponse`** / **`ProjectSummaryResponse`** (and lists).
-- **`ProjectMemberMapper`** — **`ProjectMember`** and **`User`** (owner) → **`MemberResponse`**.
+- **`UserMapper`** — signup DTO → **`User`**, entity → **`UserProfileResponse`**.
+- **`ProjectMapper`** — **`Project`** → **`ProjectResponse`** / **`ProjectSummaryResponse`** (and lists); **`owner`** on **`ProjectResponse`** is currently **ignored** in MapStruct — extend mapping if the API should return an owner object.
+- **`ProjectMemberMapper`** — **`ProjectMember`** → **`MemberResponse`**.
 
-### 5. Project service (fully implemented vertical)
+### 5. Authentication (partial)
+
+- **`AuthServiceImpl`** — **`signup`**: checks **unique username**, maps **`SignupRequest`** → **`User`**, **BCrypt-hashes** password, **saves** user, returns **`AuthResponse`** with a **placeholder** token string and profile (real **JWT** not implemented yet). **`login`** is still **not implemented** (`null`).
+- **`UserServiceImpl.getProfile`** — still **not implemented** for real data.
+
+### 6. Project service (fully implemented vertical)
 
 **`ProjectServiceImpl`** is **`@Transactional`** and uses the repositories + mapper to:
 
 | Operation | Behavior |
 |-----------|----------|
-| **Create** | Loads `User` by id, builds `Project` (name, owner, default visibility), **saves** to DB, returns **`ProjectResponse`**. |
-| **List** | Uses **`findAllAccessibleByUser`** → mapped list of summaries. |
-| **Get by id** | Loads project only if **owned by** `userId` and **not** soft-deleted; else throws (currently `RuntimeException`). |
-| **Update** | Same access check, updates name, **saves**. |
-| **Soft delete** | Sets **`deletedAt`** to now and **saves**. |
+| **Create** | Loads **`User`** by id, **saves** a new **`Project`**, then creates a **`ProjectMember`** row with role **`OWNER`** for that user (membership-based access). Returns **`ProjectResponse`**. |
+| **List** | Uses **`findAllAccessibleByUser`** → mapped list of **`ProjectSummaryResponse`**. |
+| **Get / update / soft-delete** | Loads project, ensures **not** deleted, and ensures the **`userId` has a `ProjectMember` row** for that project; otherwise access is denied. Uses **`ResourceNotFoundException`** when the project id does not exist. |
 
-Access control is **owner-based** (no shared-editor model in this service yet).
+Access is **membership-based** via **`ProjectMember`**, not a denormalized `owner` field on **`Project`**.
 
-### 6. Project member service (implemented)
+### 7. Project member service (implemented)
 
 **`ProjectMemberServiceImpl`** uses **`ProjectMemberRepository`**, **`ProjectRepository`**, **`UserRepository`**, and **`ProjectMemberMapper`**:
 
 | Operation | Behavior |
 |-----------|----------|
-| **List members** | Ensures the caller can access the project (currently **owner-only** for this check), returns **owner** as a member row plus **all `ProjectMember` rows** for the project. |
-| **Invite** | **Owner only**; resolves invitee by **email**, prevents duplicate membership and self-invite, builds composite id, **saves** `ProjectMember` with role and `invitedAt`. |
-| **Update role** | **Owner only**; loads `ProjectMember` by composite id, updates **`ProjectRole`**, **saves**. |
-| **Remove** | **Owner** may remove anyone; a **non-owner** may **remove only themselves**; deletes the `ProjectMember` row (**HTTP 204** from controller). |
+| **List members** | Caller must be a **member** of the project; returns **all `ProjectMember` rows** for the project (mapped to DTOs). |
+| **Invite** | Caller must be a **member**; resolves invitee by **`username`**, prevents duplicate membership and self-invite, **saves** `ProjectMember`. |
+| **Update role** | Caller must be a **member**; updates **`ProjectRole`** for the target member. |
+| **Remove** | **`OWNER`** may remove others; any member may **remove themselves**; **HTTP 204** on success. |
 
-### 7. HTTP API for projects
+### 8. HTTP API for projects
 
 **`ProjectController`** exposes:
 
@@ -90,20 +109,21 @@ Access control is **owner-based** (no shared-editor model in this service yet).
 - `PATCH /api/projects/{id}` — update.
 - `DELETE /api/projects/{id}` — soft delete.
 
-### 8. HTTP API for members
+### 9. HTTP API for members
 
 **`ProjectMemberController`** exposes:
 
-- `GET /api/projects/{projectId}/members` — list members (owner + invited users).
-- `POST /api/projects/{projectId}/members` — invite by email + role.
+- `GET /api/projects/{projectId}/members` — list members.
+- `POST /api/projects/{projectId}/members` — invite by **username** + role.
 - `PATCH /api/projects/{projectId}/members/{memberId}` — change role.
 - `DELETE /api/projects/{projectId}/members/{memberId}` — remove member (or leave project).
 
-**Project** and **project members** are the two areas where **controllers → service → mapper → DB** are wired end-to-end.
+**Projects** and **project members** are the main areas where **controllers → service → mapper → DB** are wired end-to-end. **Signup** persists users; **login / profile** are still incomplete.
 
-### 9. What exists but is not “done” yet
+### 10. What exists but is not “done” yet
 
-- **Auth, files, plans, subscription, Stripe, usage** — **controllers and DTOs exist**; **`service/impl`** classes still mostly return **`null`** or **empty lists** until implemented.
+- **Login, profile, files, plans, subscription, Stripe, usage** — **controllers and DTOs exist**; several **`service/impl`** methods still return **`null`** or **empty lists**.
+- **JWT / real tokens** and **securing `userId` from the security context** — not wired yet (`/api/**` permitAll).
 - **Chat, preview, ZIP download, SSE streams** — **not implemented** (no controllers for those spec paths yet).
 
 ---
@@ -138,9 +158,8 @@ Base URL (local): `http://localhost:8080`
 ## Domain model (conceptual)
 
 ```
-User ──< Project ──< ProjectFile
-              │
-              ├──< ProjectMember (EDITOR / VIEWER)
+User ──< ProjectMember (OWNER / EDITOR / VIEWER) >── Project ──< ProjectFile
+                                                         │
               ├──< ChatSession ──< ChatMessage
               ├──< Preview
               └──< UsageLog
@@ -191,8 +210,10 @@ src/main/java/com/snehil/project/lovable_clone/
 ├── dto/
 ├── entity/
 ├── enums/
+├── error/
 ├── mapper/
 ├── repository/
+├── security/
 └── service/
     └── impl/
 ```
@@ -215,7 +236,7 @@ src/main/java/com/snehil/project/lovable_clone/
 **Auth**
 
 - [ ] Login *(route: `POST /api/auth/login`)*
-- [ ] Sign up *(route: `POST /api/auth/signup`)*
+- [x] Sign up *(route: `POST /api/auth/signup` — persists user + BCrypt; placeholder token)*
 - [ ] Get my profile *(route: `GET /api/auth/me`)*
 
 **AI code generation**
@@ -244,13 +265,13 @@ src/main/java/com/snehil/project/lovable_clone/
 - [ ] Token usage & previews-running quotas
 - [ ] Rate limiting (e.g. Redis)
 - [ ] Zipkin tracing
-- [x] Members — one project, many users *(invite by email, roles, remove; see **Project member service** above)*
+- [x] Members — one project, many users *(invite by **username**, roles, remove; see **Project member service** above)*
 
 ### Core APIs — implementation snapshot
 
 | Area | Spec | In codebase |
 |------|------|-------------|
-| Auth | `POST /api/auth/login`, `POST /api/auth/signup`, `GET /api/auth/me` | Routes yes · logic no |
+| Auth | `POST /api/auth/login`, `POST /api/auth/signup`, `GET /api/auth/me` | Signup persists user + hash · login & profile still stubbed |
 | Projects | CRUD `/api/projects/{id}`, `GET /api/projects` | Yes (projects CRUD + list) |
 | Files | Tree, file by path, `GET .../download-zip` | Tree + path routes · stubs · **no** download-zip |
 | Members | `GET/POST/PATCH/DELETE` `/api/projects/{id}/members...` | Yes (persistence + rules) |
@@ -265,7 +286,8 @@ src/main/java/com/snehil/project/lovable_clone/
 - [x] Entity classes & REST scaffolding
 - [x] MapStruct & `ProjectService`
 - [x] Project member management
-- [ ] Exception handling, Spring Security & JWT
+- [x] Global exception handling & validation errors *(see `GlobalExceptionHandler`)*
+- [x] Spring Security baseline *(password encoder, stateless sessions; **JWT filter** still TODO)*
 - [ ] Stripe integration & webhooks
 - [ ] AI, MinIO, previews, K8s, distributed architecture
 
