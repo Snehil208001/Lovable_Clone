@@ -26,7 +26,8 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 - **Services** — interfaces in `service/` with implementations in `service/impl/`.
 - **Mappers** — `ProjectMapper`, `ProjectMemberMapper`, `UserMapper` (MapStruct).
 - **Errors** — `GlobalExceptionHandler`, `ApiError`, custom exceptions under `error/`.
-- **Security** — `WebSecurityConfig`, `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`.
+- **Security** — `WebSecurityConfig` (`@EnableMethodSecurity`), `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`, **`SecurityExpression`** (`@Component("security")`) for **`@PreAuthorize`** on project APIs.
+- **Roles & permissions** — `ProjectRole` (**OWNER**, **EDITOR**, **VIEWER**) maps to **`ProjectPermission`** (view, edit, delete, manage members, view members); used by **`SecurityExpression`** and **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
 
 Configure the database in `src/main/resources/application.yml` (URL, user, password). Use your own credentials locally and avoid committing production secrets.
 
@@ -44,6 +45,7 @@ This section describes **what is actually implemented end-to-end** today—not o
 #### Security (`security/`)
 
 - **Stateless** HTTP sessions (`SessionCreationPolicy.STATELESS`), **CSRF disabled** (API + Bearer tokens).
+- **`@EnableMethodSecurity`** — project services use **`@PreAuthorize`** with SpEL such as **`@security.canViewProject(#id)`**, **`@security.canEditProject(#id)`**, **`@security.canManageMembers(#projectId)`**, where **`security`** is the **`SecurityExpression`** bean. It resolves the current user from the JWT context and checks **`ProjectRole`** permissions via **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
 - **`POST /api/auth/signup`** and **`POST /api/auth/login`** are **public** (`permitAll`). **Every other `/api/**` route** (including **`GET /api/auth/me`**) requires a valid **`Authorization: Bearer <JWT>`**; **`JwtAuthFilter`** validates the token and sets **`JwtUserPrincipal`**. Controllers use **`@AuthenticationPrincipal JwtUserPrincipal`** (user id from token claims).
 - **`BCryptPasswordEncoder`** for **password hashing** (signup and login).
 
@@ -56,7 +58,7 @@ This section describes **what is actually implemented end-to-end** today—not o
 
 - **`User`** — `@Entity` on table `users`: id, **`username`**, **password** (stored **BCrypt-hashed**), name, timestamps, optional soft-delete `deletedAt`.
 - **`Project`** — `@Entity` on `projects`: id, name, visibility, timestamps, soft-delete; **no `owner` column** — ownership and roles live in **`ProjectMember`** (including **`OWNER`**).
-- **`ProjectMember`** — `@Entity` with **`@EmbeddedId` `ProjectMemberId`**, links to **`Project`** and **`User`**, **`ProjectRole`** (`OWNER`, `EDITOR`, `VIEWER`), invite/accept times.
+- **`ProjectMember`** — `@Entity` with **`@EmbeddedId` `ProjectMemberId`**, links to **`Project`** and **`User`**, **`ProjectRole`** (`OWNER`, `EDITOR`, `VIEWER`) each carrying a set of **`ProjectPermission`** values, invite/accept times.
 - Other classes under `entity/` (e.g. chat, preview, plan) exist as domain shapes; **not all are mapped or used in live flows yet.**
 
 ### 3. Repositories
@@ -65,7 +67,7 @@ This section describes **what is actually implemented end-to-end** today—not o
 - **`ProjectRepository`** — `JpaRepository<Project, Long>` with:
   - **`findAllAccessibleByUser(userId)`** — lists **non-deleted** projects where the user has a **`project_members`** row: `INNER JOIN ProjectMember` on composite id (`projectId`, `userId`), plus an **`EXISTS`** guard on the same membership, **`DISTINCT`**, ordered by **`updatedAt`** descending.
   - **`findAccessibleProjectById(projectId, userId)`** — returns **`Optional<Project>`** only when the project exists, **`deletedAt` is null**, and the user is a member (same join + **`EXISTS`** pattern). Used by **`ProjectServiceImpl`** for get/update/delete so access rules stay in the repository layer.
-- **`ProjectMemberRepository`** — `JpaRepository<ProjectMember, ProjectMemberId>` for membership rows (invite, list, update role, delete).
+- **`ProjectMemberRepository`** — `JpaRepository<ProjectMember, ProjectMemberId>`; **`findByIdProjectId`**, **`findRoleByProjectIdAndUserId`** (for **`SecurityExpression`** permission checks).
 
 ### 4. Mapping layer
 
@@ -86,9 +88,10 @@ This section describes **what is actually implemented end-to-end** today—not o
 |-----------|----------|
 | **Create** | Loads **`User`** by id, **saves** a new **`Project`**, then creates a **`ProjectMember`** row with role **`OWNER`** for that user (membership-based access). Returns **`ProjectResponse`**. |
 | **List** | Uses **`ProjectRepository.findAllAccessibleByUser`** → mapped list of **`ProjectSummaryResponse`**. |
-| **Get / update / soft-delete** | Uses **`ProjectRepository.findAccessibleProjectById`** (membership + not soft-deleted). If empty, throws **`ResourceNotFoundException`** (same response shape for unknown id, deleted project, or non-member). |
+| **Get** | **`@PreAuthorize("@security.canViewProject(#id)")`** — **`ProjectRepository.findAccessibleProjectById`**; if empty, **`ResourceNotFoundException`**. |
+| **Update / soft-delete** | **`@PreAuthorize("@security.canEditProject(#id)")`** — same repository lookup as get; soft-delete sets **`deletedAt`**. |
 
-Access is **membership-based** via **`ProjectMember`**, not a denormalized `owner` field on **`Project`**.
+Access is **membership-based** via **`ProjectMember`**, not a denormalized `owner` field on **`Project`**. Method security enforces **view** vs **edit** using **`ProjectPermission`** on the caller’s role.
 
 ### 7. Project member service (implemented)
 
@@ -96,10 +99,10 @@ Access is **membership-based** via **`ProjectMember`**, not a denormalized `owne
 
 | Operation | Behavior |
 |-----------|----------|
-| **List members** | Caller must be a **member** of the project; returns **all `ProjectMember` rows** for the project (mapped to DTOs). |
-| **Invite** | Caller must be a **member**; resolves invitee by **`username`**, prevents duplicate membership and self-invite, **saves** `ProjectMember`. |
-| **Update role** | Caller must be a **member**; updates **`ProjectRole`** for the target member. |
-| **Remove** | **`OWNER`** may remove others; any member may **remove themselves**; **HTTP 204** on success. |
+| **List members** | **`@PreAuthorize("@security.canViewProject(#projectId)")`** — membership + **`ResourceNotFoundException`** / **`AccessDeniedException`** where applicable; returns **all `ProjectMember` rows** for the project. |
+| **Invite** | **`@PreAuthorize("@security.canManageMembers(#projectId)")`** — invitee by **`username`**, **`BadRequestException`** for self-invite or duplicate; **saves** `ProjectMember`. |
+| **Update role** | **`@PreAuthorize("@security.canManageMembers(#projectId)")`** — updates **`ProjectRole`** for the target member. |
+| **Remove** | **`@PreAuthorize("@security.canViewProject(#projectId)")`** — **`OWNER`** may remove others; any member may **remove themselves**; otherwise **`AccessDeniedException`**; **HTTP 204** on success. |
 
 ### 8. HTTP API for projects
 

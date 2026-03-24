@@ -8,6 +8,8 @@ import com.snehil.project.lovable_clone.entity.ProjectMember;
 import com.snehil.project.lovable_clone.entity.ProjectMemberId;
 import com.snehil.project.lovable_clone.entity.User;
 import com.snehil.project.lovable_clone.enums.ProjectRole;
+import com.snehil.project.lovable_clone.error.BadRequestException;
+import com.snehil.project.lovable_clone.error.ResourceNotFoundException;
 import com.snehil.project.lovable_clone.mapper.ProjectMemberMapper;
 import com.snehil.project.lovable_clone.repository.ProjectMemberRepository;
 import com.snehil.project.lovable_clone.repository.ProjectRepository;
@@ -16,7 +18,10 @@ import com.snehil.project.lovable_clone.service.ProjectMemberService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +29,7 @@ import java.util.List;
 @Service
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @RequiredArgsConstructor
+@Transactional
 public class ProjectMemberServiceImpl implements ProjectMemberService {
 
     ProjectMemberRepository projectMemberRepository;
@@ -32,6 +38,7 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
     UserRepository userRepository;
 
     @Override
+    @PreAuthorize("@security.canViewProject(#projectId)")
     public List<MemberResponse> getProjectMembers(Long projectId, Long userId) {
         Project project = getProjectIfAccessibleAndNotDeleted(projectId, userId);
 
@@ -42,22 +49,22 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
     }
 
     @Override
+    @PreAuthorize("@security.canManageMembers(#projectId)")
     public MemberResponse inviteMember(Long projectId, InviteMemberRequest request, Long userId) {
         Project project = getProjectIfAccessibleAndNotDeleted(projectId, userId);
 
-        // Changed findByEmail(request.email()) to findByUsername(request.username())
         User invitee = userRepository.findByUsername(request.username()).orElseThrow(
-                () -> new RuntimeException("User not found")
+                () -> new ResourceNotFoundException("User", request.username())
         );
 
         if (invitee.getId().equals(userId)){
-            throw new RuntimeException("Cannot invite yourself");
+            throw new BadRequestException("Cannot invite yourself");
         }
 
         ProjectMemberId projectMemberId = new ProjectMemberId(projectId, invitee.getId());
 
         if (projectMemberRepository.existsById(projectMemberId)) {
-            throw new RuntimeException("Cannot invite once again");
+            throw new BadRequestException("User is already a member");
         }
 
         ProjectMember member = ProjectMember.builder()
@@ -74,11 +81,13 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
     }
 
     @Override
+    @PreAuthorize("@security.canManageMembers(#projectId)")
     public MemberResponse updateMemberRole(Long projectId, Long memberId, UpdateMemberRoleRequest request, Long userId) {
         Project project = getProjectIfAccessibleAndNotDeleted(projectId, userId);
 
         ProjectMemberId projectMemberId = new ProjectMemberId(projectId, memberId);
-        ProjectMember projectMember = projectMemberRepository.findById(projectMemberId).orElseThrow();
+        ProjectMember projectMember = projectMemberRepository.findById(projectMemberId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProjectMember", memberId.toString()));
 
         projectMember.setProjectRole(request.role());
         projectMemberRepository.save(projectMember);
@@ -86,24 +95,25 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
     }
 
     @Override
+    @PreAuthorize("@security.canViewProject(#projectId)")
     public Void removeProjectMember(Long projectId, Long memberId, Long userId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Project", projectId.toString()));
 
         ProjectMember currentUserMember = projectMemberRepository.findById(new ProjectMemberId(projectId, userId))
-                .orElseThrow(() -> new RuntimeException("Access denied"));
+                .orElseThrow(() -> new AccessDeniedException("Access denied"));
 
         boolean isOwner = currentUserMember.getProjectRole() == ProjectRole.OWNER;
         boolean isRemovingSelf = memberId.equals(userId);
 
         if (!isOwner && !isRemovingSelf) {
-            throw new RuntimeException("Not allowed to remove this member");
+            throw new AccessDeniedException("Not allowed to remove this member. Only owners can remove other users.");
         }
 
         ProjectMemberId targetMemberId = new ProjectMemberId(projectId, memberId);
 
         if (!projectMemberRepository.existsById(targetMemberId)) {
-            throw new RuntimeException("Member not found in this project");
+            throw new ResourceNotFoundException("Member", memberId.toString());
         }
 
         projectMemberRepository.deleteById(targetMemberId);
@@ -113,14 +123,14 @@ public class ProjectMemberServiceImpl implements ProjectMemberService {
 
     private Project getProjectIfAccessibleAndNotDeleted(Long projectId, Long userId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found with id: " + projectId));
+                .orElseThrow(() -> new ResourceNotFoundException("Project", projectId.toString()));
 
         if (project.getDeletedAt() != null) {
-            throw new RuntimeException("Project not found");
+            throw new ResourceNotFoundException("Project", projectId.toString());
         }
 
         projectMemberRepository.findById(new ProjectMemberId(projectId, userId))
-                .orElseThrow(() -> new RuntimeException("Access denied"));
+                .orElseThrow(() -> new AccessDeniedException("Access denied"));
 
         return project;
     }
