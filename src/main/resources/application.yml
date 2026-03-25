@@ -5,7 +5,8 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:9000/testDB
     username: testUser
-    password: password
+    # Replaced hardcoded password with an environment variable
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -16,15 +17,16 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-
 jwt:
-  secret-key: ${JWT_SECRET_KEY:development-only-replace-with-long-random-secret-min-32-chars}
+  # Replaced hardcoded key with an environment variable
+  secret-key: ${JWT_SECRET_KEY}
 
 stripe:
   api:
-    secret: ${STRIPE_API_SECRET:}
+    # Replaced hardcoded Stripe API key
+    secret: ${STRIPE_API_KEY}
   webhook:
-    secret: ${STRIPE_WEBHOOK_SECRET:}
+    # Replaced hardcoded Stripe Webhook secret
+    secret: ${STRIPE_WEBHOOK_SECRET}
 
-client:
-  url: ${CLIENT_URL:http://localhost:8080}
+client.url: http://localhost:8080

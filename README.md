@@ -210,6 +210,8 @@ client:
   url: ${CLIENT_URL:http://localhost:8080}
 ```
 
+The committed **`src/main/resources/application.yml`** may use the same idea with different env names (for example **`DB_PASSWORD`**, **`JWT_SECRET_KEY`**, **`STRIPE_API_KEY`**, **`STRIPE_WEBHOOK_SECRET`**) and a **`client.url`** value for Stripe Checkout redirects—keep your shell or deployment in sync with that file.
+
 ## Run
 
 ```bash
