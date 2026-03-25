@@ -22,8 +22,6 @@ public class Subscription {
 
     SubscriptionStatus status;
 
-    String stripeCustomerId;
-
     String stripeSubscriptionId;
 
     Instant currentPeriodStart;

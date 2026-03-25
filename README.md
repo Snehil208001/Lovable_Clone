@@ -15,21 +15,22 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 | Validation | Bean Validation (`spring-boot-starter-validation`) |
 | Mapping | MapStruct |
 | Build | Maven (wrapper included) |
+| Payments | Stripe Java SDK (`stripe-java`) |
 | Other | Lombok |
 
 ## What’s in the repo
 
-- **REST API** — auth, projects, members, files, plans, subscription/checkout stubs, usage.
+- **REST API** — auth, projects, members, files, plans, **Stripe checkout + customer portal (partial)**, subscription APIs, usage stubs, payment webhooks.
 - **DTOs** — request/response records under `dto/` (with validation annotations where used).
 - **Entities & enums** — domain model under `entity/` and `enums/`.
-- **Repositories** — `UserRepository`, `ProjectRepository`, `ProjectMemberRepository`.
+- **Repositories** — `UserRepository`, `ProjectRepository`, `ProjectMemberRepository`, **`PlanRepository`**.
 - **Services** — interfaces in `service/` with implementations in `service/impl/`.
 - **Mappers** — `ProjectMapper`, `ProjectMemberMapper`, `UserMapper` (MapStruct).
 - **Errors** — `GlobalExceptionHandler`, `ApiError`, custom exceptions under `error/`.
 - **Security** — `WebSecurityConfig` (`@EnableMethodSecurity`), `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`, **`SecurityExpression`** (`@Component("security")`) for **`@PreAuthorize`** on project APIs.
 - **Roles & permissions** — `ProjectRole` (**OWNER**, **EDITOR**, **VIEWER**) maps to **`ProjectPermission`** (view, edit, delete, manage members, view members); used by **`SecurityExpression`** and **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
 
-Configure the database in `src/main/resources/application.yml` (URL, user, password). Use your own credentials locally and avoid committing production secrets.
+Configure the database and secrets locally: **`application.yml`** holds defaults; **do not commit real API keys**. Set **`STRIPE_API_SECRET`**, **`STRIPE_WEBHOOK_SECRET`**, and optionally **`JWT_SECRET_KEY`** / **`CLIENT_URL`** via environment variables (or use an untracked **`application-local.yml`** — see **`.gitignore`**).
 
 ## Completed work (explained)
 
@@ -46,7 +47,7 @@ This section describes **what is actually implemented end-to-end** today—not o
 
 - **Stateless** HTTP sessions (`SessionCreationPolicy.STATELESS`), **CSRF disabled** (API + Bearer tokens).
 - **`@EnableMethodSecurity`** — project services use **`@PreAuthorize`** with SpEL such as **`@security.canViewProject(#id)`**, **`@security.canEditProject(#id)`**, **`@security.canManageMembers(#projectId)`**, where **`security`** is the **`SecurityExpression`** bean. It resolves the current user from the JWT context and checks **`ProjectRole`** permissions via **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
-- **`POST /api/auth/signup`** and **`POST /api/auth/login`** are **public** (`permitAll`). **Every other `/api/**` route** (including **`GET /api/auth/me`**) requires a valid **`Authorization: Bearer <JWT>`**; **`JwtAuthFilter`** validates the token and sets **`JwtUserPrincipal`**. Controllers use **`@AuthenticationPrincipal JwtUserPrincipal`** (user id from token claims).
+- **`POST /api/auth/signup`**, **`POST /api/auth/login`**, and **`POST /webhooks/**`** (Stripe signature verification) are **public** (`permitAll`). **Every other `/api/**` route** (including **`GET /api/auth/me`**) requires a valid **`Authorization: Bearer <JWT>`**; **`JwtAuthFilter`** validates the token and sets **`JwtUserPrincipal`**. Controllers use **`@AuthenticationPrincipal JwtUserPrincipal`** (user id from token claims).
 - **`BCryptPasswordEncoder`** for **password hashing** (signup and login).
 
 #### API errors (`error/` + `GlobalExceptionHandler`)
@@ -127,7 +128,8 @@ Access is **membership-based** via **`ProjectMember`**, not a denormalized `owne
 
 ### 10. What exists but is not “done” yet
 
-- **Files, subscription, Stripe, usage** — **controllers and DTOs exist**; several **`service/impl`** methods still return **`null`** or **empty lists**.
+- **Billing** — **Stripe** checkout URLs (**`PaymentProcessor`** / **`StripePaymentProcessor`**), **`PaymentConfig`**, and **`POST /webhooks/payment`** are wired; **customer portal** and deep subscription persistence may still be partial; **set Stripe env vars** before calling live APIs.
+- **Files, usage** — routes exist; some **`service/impl`** methods still return **`null`** or **empty lists**.
 - **Chat, preview, ZIP download, SSE streams** — **not implemented** (no controllers for those spec paths yet).
 
 ---
@@ -154,8 +156,9 @@ Base URL (local): `http://localhost:8080`
 | Files | `GET` | `/api/projects/{projectId}/files/{*path}` |
 | Plans | `GET` | `/api/plans` |
 | Subscription | `GET` | `/api/me/subscription` |
-| Billing | `POST` | `/api/stripe/checkout` |
-| Billing | `POST` | `/api/stripe/portal` |
+| Billing | `POST` | `/api/payments/checkout` |
+| Billing | `POST` | `/api/payments/portal` |
+| Webhooks | `POST` | `/webhooks/payment` |
 | Usage | `GET` | `/api/usage/today` |
 | Usage | `GET` | `/api/usage/limits` |
 
@@ -179,7 +182,7 @@ Plan ──< Subscription ──> User
 
 ## Configuration
 
-Example `application.yml` shape (adjust host, port, database name, and credentials):
+Example configuration shape (use **environment variables** for secrets in shared or production environments):
 
 ```yaml
 spring:
@@ -193,6 +196,18 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY:}
+
+stripe:
+  api:
+    secret: ${STRIPE_API_SECRET:}
+  webhook:
+    secret: ${STRIPE_WEBHOOK_SECRET:}
+
+client:
+  url: ${CLIENT_URL:http://localhost:8080}
 ```
 
 ## Run
@@ -210,6 +225,7 @@ mvnw.cmd spring-boot:run
 ```
 src/main/java/com/snehil/project/lovable_clone/
 ├── LovableCloneApplication.java
+├── config/
 ├── controller/
 ├── dto/
 ├── entity/
@@ -264,7 +280,7 @@ src/main/java/com/snehil/project/lovable_clone/
 
 ### Additional features
 
-- [ ] Payment (Stripe)
+- [x] Payment (Stripe) *(checkout session + webhook endpoint; configure API and webhook secrets via env)*
 - [ ] Quota management — plans FREE | PRO
 - [ ] Token usage & previews-running quotas
 - [ ] Rate limiting (e.g. Redis)
@@ -279,7 +295,7 @@ src/main/java/com/snehil/project/lovable_clone/
 | Projects | CRUD `/api/projects/{id}`, `GET /api/projects` | Yes (projects CRUD + list) |
 | Files | Tree, file by path, `GET .../download-zip` | Tree + path routes · stubs · **no** download-zip |
 | Members | `GET/POST/PATCH/DELETE` `/api/projects/{id}/members...` | Yes (persistence + rules) |
-| Plans & billing | `GET /api/plans`, `GET /api/me/subscription`, `POST /api/stripe/checkout`, `POST /api/stripe/portal` | Routes yes · logic no |
+| Plans & billing | `GET /api/plans`, `GET /api/me/subscription`, `POST /api/payments/checkout`, `POST /api/payments/portal`, `POST /webhooks/payment` | Stripe SDK + checkout; webhook handler; subscription/portal evolving |
 | Usage | `GET /api/usage/today`, `GET /api/usage/limits` | Routes yes · logic no |
 | Chat & AI | `.../chat-sessions`, messages, `POST /api/chat/stream` (SSE) | **Not implemented** |
 | Preview & runner | `POST .../preview`, preview status, logs SSE, `DELETE .../preview` | **Not implemented** |
@@ -292,7 +308,7 @@ src/main/java/com/snehil/project/lovable_clone/
 - [x] Project member management
 - [x] Global exception handling & validation errors *(see `GlobalExceptionHandler`)*
 - [x] Spring Security + JWT *(password encoder, `JwtAuthFilter`, protected `/api/**` except auth)*
-- [ ] Stripe integration & webhooks
+- [x] Stripe integration & webhooks *(baseline: checkout, `PaymentConfig`, `POST /webhooks/payment`)*
 - [ ] AI, MinIO, previews, K8s, distributed architecture
 
 ---

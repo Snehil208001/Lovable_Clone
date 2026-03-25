@@ -16,5 +16,15 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+
 jwt:
-  secret-key: 3b2u3i2u4u324u34uiib324uig4yg32ui4g32iug4iu32g4ui23g5y5yigi6i54ui45hui6hu34i5hui34h5
+  secret-key: ${JWT_SECRET_KEY:development-only-replace-with-long-random-secret-min-32-chars}
+
+stripe:
+  api:
+    secret: ${STRIPE_API_SECRET:}
+  webhook:
+    secret: ${STRIPE_WEBHOOK_SECRET:}
+
+client:
+  url: ${CLIENT_URL:http://localhost:8080}
