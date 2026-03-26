@@ -1,0 +1,19 @@
+# Copy this file to: src/main/resources/application-local.yml
+# (That path is gitignored — put your real keys there only.)
+#
+# jwt.secret-key — long random string (HS256 needs enough bytes; 32+ characters is typical).
+# stripe.api.secret — from Stripe Dashboard → Developers → API keys (e.g. sk_test_...).
+# stripe.webhook.secret — from Stripe Dashboard → Developers → Webhooks → signing secret (whsec_...).
+# client.url — front-end base URL used for Stripe Checkout success/cancel redirects.
+
+jwt:
+  secret-key: YOUR_JWT_SECRET_HERE
+
+stripe:
+  api:
+    secret: YOUR_STRIPE_SECRET_KEY_HERE
+  webhook:
+    secret: YOUR_STRIPE_WEBHOOK_SIGNING_SECRET_HERE
+
+client:
+  url: http://localhost:8080

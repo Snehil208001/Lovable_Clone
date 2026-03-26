@@ -43,7 +43,7 @@ public class BillingController {
     @GetMapping("/api/me/subscription")
     public ResponseEntity<SubscriptionResponse> getMySubscription(
             @AuthenticationPrincipal JwtUserPrincipal currentUser) {
-        return ResponseEntity.ok(subscriptionService.getCurrentSubscription(currentUser.userId()));
+        return ResponseEntity.ok(subscriptionService.getCurrentSubscription());
     }
 
     @PostMapping("/api/payments/checkout")

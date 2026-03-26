@@ -1,12 +1,20 @@
 package com.snehil.project.lovable_clone.service;
 
-import com.snehil.project.lovable_clone.dto.subscriptions.CheckoutRequest;
-import com.snehil.project.lovable_clone.dto.subscriptions.CheckoutResponse;
-import com.snehil.project.lovable_clone.dto.subscriptions.PostalResponse;
 import com.snehil.project.lovable_clone.dto.subscriptions.SubscriptionResponse;
-import org.jspecify.annotations.Nullable;
+import com.snehil.project.lovable_clone.enums.SubscriptionStatus;
+
+import java.time.Instant;
 
 public interface SubscriptionService {
-    SubscriptionResponse getCurrentSubscription(Long userId);
+    SubscriptionResponse getCurrentSubscription();
 
+    void activateSubscription(Long userId, Long planId, String subscriptionId, String customerId);
+
+    void updateSubscription(String subscriptionId, SubscriptionStatus status, Instant periodStart, Instant periodEnd, Boolean cancelAtPeriodEnd, Long planId);
+
+    void cancelSubscription(String subscriptionId);
+
+    void renewSubscriptionPeriod(String subId, Instant periodStart, Instant periodEnd);
+
+    void markSubscriptionPastDue(String subId);
 }
