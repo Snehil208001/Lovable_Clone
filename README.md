@@ -30,7 +30,7 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 - **Security** — `WebSecurityConfig` (`@EnableMethodSecurity`), `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`, **`SecurityExpression`** (`@Component("security")`) for **`@PreAuthorize`** on project APIs.
 - **Roles & permissions** — `ProjectRole` (**OWNER**, **EDITOR**, **VIEWER**) maps to **`ProjectPermission`** (view, edit, delete, manage members, view members); used by **`SecurityExpression`** and **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
 
-Configure the database and secrets locally: **`application.yml`** holds defaults; **do not commit real API keys**. Set **`STRIPE_API_SECRET`**, **`STRIPE_WEBHOOK_SECRET`**, and optionally **`JWT_SECRET_KEY`** / **`CLIENT_URL`** via environment variables (or use an untracked **`application-local.yml`** — see **`.gitignore`**).
+Configure the database and secrets locally: **`application.yml`** uses environment variables—set **`DB_PASSWORD`**, **`JWT_SECRET_KEY`**, **`STRIPE_API_KEY`**, **`STRIPE_WEBHOOK_SECRET`** (and configure **`client.url`** in that file for Stripe redirects). **Do not commit real API keys** to version control.
 
 ## Completed work (explained)
 
@@ -191,26 +191,25 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:9000/your_database
     username: your_username
-    password: your_password
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: update
 
 jwt:
-  secret-key: ${JWT_SECRET_KEY:}
+  secret-key: ${JWT_SECRET_KEY}
 
 stripe:
   api:
-    secret: ${STRIPE_API_SECRET:}
+    secret: ${STRIPE_API_KEY}
   webhook:
-    secret: ${STRIPE_WEBHOOK_SECRET:}
+    secret: ${STRIPE_WEBHOOK_SECRET}
 
+# Committed app may use a flat key, e.g. client.url: http://localhost:8080
 client:
   url: ${CLIENT_URL:http://localhost:8080}
 ```
-
-The committed **`src/main/resources/application.yml`** may use the same idea with different env names (for example **`DB_PASSWORD`**, **`JWT_SECRET_KEY`**, **`STRIPE_API_KEY`**, **`STRIPE_WEBHOOK_SECRET`**) and a **`client.url`** value for Stripe Checkout redirects—keep your shell or deployment in sync with that file.
 
 ## Run
 
