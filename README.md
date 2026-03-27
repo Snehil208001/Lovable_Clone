@@ -23,9 +23,9 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 - **REST API** — auth, projects, members, files, plans, **Stripe checkout + customer portal (partial)**, subscription APIs, usage stubs, payment webhooks.
 - **DTOs** — request/response records under `dto/` (with validation annotations where used).
 - **Entities & enums** — domain model under `entity/` and `enums/`.
-- **Repositories** — `UserRepository`, `ProjectRepository`, `ProjectMemberRepository`, **`PlanRepository`**.
-- **Services** — interfaces in `service/` with implementations in `service/impl/`.
-- **Mappers** — `ProjectMapper`, `ProjectMemberMapper`, `UserMapper` (MapStruct).
+- **Repositories** — `UserRepository`, `ProjectRepository`, `ProjectMemberRepository`, **`PlanRepository`**, **`SubscriptionRepository`**.
+- **Services** — interfaces in `service/` with implementations in `service/impl/` (including **`SubscriptionService`** for billing flows).
+- **Mappers** — `ProjectMapper`, `ProjectMemberMapper`, `UserMapper`, **`SubscriptionMapper`** (MapStruct).
 - **Errors** — `GlobalExceptionHandler`, `ApiError`, custom exceptions under `error/`.
 - **Security** — `WebSecurityConfig` (`@EnableMethodSecurity`), `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`, **`SecurityExpression`** (`@Component("security")`) for **`@PreAuthorize`** on project APIs.
 - **Roles & permissions** — `ProjectRole` (**OWNER**, **EDITOR**, **VIEWER**) maps to **`ProjectPermission`** (view, edit, delete, manage members, view members); used by **`SecurityExpression`** and **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
