@@ -8,12 +8,14 @@ import com.snehil.project.lovable_clone.entity.ProjectMember;
 import com.snehil.project.lovable_clone.entity.ProjectMemberId;
 import com.snehil.project.lovable_clone.entity.User;
 import com.snehil.project.lovable_clone.enums.ProjectRole;
+import com.snehil.project.lovable_clone.error.BadRequestException;
 import com.snehil.project.lovable_clone.error.ResourceNotFoundException;
 import com.snehil.project.lovable_clone.mapper.ProjectMapper;
 import com.snehil.project.lovable_clone.repository.ProjectMemberRepository;
 import com.snehil.project.lovable_clone.repository.ProjectRepository;
 import com.snehil.project.lovable_clone.repository.UserRepository;
 import com.snehil.project.lovable_clone.service.ProjectService;
+import com.snehil.project.lovable_clone.service.SubscriptionService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -34,13 +36,20 @@ public class ProjectServiceImpl implements ProjectService {
     UserRepository userRepository;
     ProjectMapper projectMapper;
     ProjectMemberRepository projectMemberRepository;
+    SubscriptionService subscriptionService;
 
     @Override
     public ProjectResponse createProject(ProjectRequest request, Long userId) {
 
+        if (!subscriptionService.canCreateNewProject()) {
+            throw new BadRequestException("User cannot create a New Project with current plan, Upgrade plan now ");
+        }
+
         User owner = userRepository.findById(userId).orElseThrow(
                 () -> new ResourceNotFoundException("User", userId.toString())
         );
+
+
 
         Project project = Project.builder()
                 .name(request.name())

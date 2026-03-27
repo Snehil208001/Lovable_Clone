@@ -6,6 +6,7 @@ import com.snehil.project.lovable_clone.dto.subscriptions.PostalResponse;
 import com.snehil.project.lovable_clone.entity.Plan;
 import com.snehil.project.lovable_clone.entity.User;
 import com.snehil.project.lovable_clone.enums.SubscriptionStatus;
+import com.snehil.project.lovable_clone.error.BadRequestException;
 import com.snehil.project.lovable_clone.error.ResourceNotFoundException;
 import com.snehil.project.lovable_clone.repository.PlanRepository;
 import com.snehil.project.lovable_clone.repository.UserRepository;
@@ -81,7 +82,28 @@ public class StripePaymentProcessor implements PaymentProcessor {
 
     @Override
     public PostalResponse openCustomerPortal(Long userId) {
-        return null;
+        // FIX: Removed 'Long' to prevent variable redeclaration error.
+        // It now correctly updates the method parameter with the authenticated user's ID.
+        userId = authUtil.getCurrentUserId();
+        User user = getUser(userId);
+        String stripeCustomerId = user.getStripeCustomerId();
+
+        if (stripeCustomerId == null || stripeCustomerId.isEmpty()) {
+            throw new BadRequestException("User does not have a Stripe Customer Id, UserId:" + userId);
+        }
+
+        try {
+            var portalSession = com.stripe.model.billingportal.Session.create(
+                    com.stripe.param.billingportal.SessionCreateParams.builder()
+                            .setCustomer(stripeCustomerId)
+                            .setReturnUrl(frontendUrl)
+                            .build()
+            );
+            return new PostalResponse(portalSession.getUrl());
+        } catch (StripeException e) {
+            throw new RuntimeException(e);
+        }
+
     }
 
     @Override
@@ -91,7 +113,7 @@ public class StripePaymentProcessor implements PaymentProcessor {
 
         switch (type) {
             case "checkout.session.completed" -> handleCheckoutSessionCompleted((Session) stripeObject,metadata);
-            case "customer.subscription.update" -> handleCustomerSubscriptionUpdated((Subscription) stripeObject);
+            case "customer.subscription.updated" -> handleCustomerSubscriptionUpdated((Subscription) stripeObject);
             case "customer.subscription.deleted" -> handleCustomerSubscriptionDeleted((Subscription) stripeObject);
             case "invoice.paid" -> handleInvoicePaid((Invoice) stripeObject);
             case "invoice.payment_failed" -> handleInvoicePaymentFailed((Invoice) stripeObject);
@@ -99,10 +121,10 @@ public class StripePaymentProcessor implements PaymentProcessor {
         }
     }
     private void handleCheckoutSessionCompleted(Session session,Map<String, String > metadata) {
-      if (session == null) {
-          log.error("session object was null");
-          return;
-      }
+        if (session == null) {
+            log.error("session object was null");
+            return;
+        }
 
         Long userId = Long.parseLong(metadata.get("user_id"));
         Long planId = Long.parseLong(metadata.get("plan_id"));

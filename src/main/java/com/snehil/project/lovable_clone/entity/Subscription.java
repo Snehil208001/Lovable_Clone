@@ -1,6 +1,5 @@
 package com.snehil.project.lovable_clone.entity;
 
-
 import com.snehil.project.lovable_clone.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -36,6 +35,9 @@ public class Subscription {
 
     Instant currentPeriodStart;
     Instant currentPeriodEnd;
+
+    // FIX: Added @Builder.Default to ensure Lombok respects the default value
+    @Builder.Default
     Boolean cancelAtPeriodEnd = false;
 
     @CreationTimestamp
