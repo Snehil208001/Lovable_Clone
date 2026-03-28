@@ -5,7 +5,6 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:9000/testDB
     username: testUser
-    # Replaced hardcoded password with an environment variable
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
@@ -17,16 +16,23 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+
+ai:
+  openai:
+    api-key:
+    base-url: https://openrouter.ai/api
+    chat:
+      options:
+        model: openai/gpt-4o-mini
+        temperature: 0.0   # FIXED (indentation only)
+
 jwt:
-  # Replaced hardcoded key with an environment variable
   secret-key: ${JWT_SECRET_KEY}
 
 stripe:
   api:
-    # Replaced hardcoded Stripe API key
     secret: ${STRIPE_API_KEY}
   webhook:
-    # Replaced hardcoded Stripe Webhook secret
     secret: ${STRIPE_WEBHOOK_SECRET}
 
 client.url: http://localhost:8080
