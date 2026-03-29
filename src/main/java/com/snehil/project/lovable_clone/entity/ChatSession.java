@@ -19,7 +19,7 @@ import java.time.Instant;
 public class ChatSession {
 
     @EmbeddedId
-    private ChatSession id;
+    private ChatSessionId id;
 
     @ManyToOne(fetch = FetchType.LAZY,optional = false)
     @MapsId("projectId")

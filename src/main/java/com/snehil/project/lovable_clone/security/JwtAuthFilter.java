@@ -23,6 +23,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final AuthUtil authUtil;
     private final JwtAuthEntryPoint jwtAuthEntryPoint;
 
+    /**
+     * SSE / {@code Flux} endpoints use Servlet async. By default {@link OncePerRequestFilter} does not run
+     * on ASYNC dispatch, so {@link SecurityContextHolder} stays empty there and secured streaming returns 401.
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
@@ -42,7 +51,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             JwtUserPrincipal user = authUtil.verifyAccessToken(jwtToken);
-            if (user != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            // Always attach JWT when the header is present and valid. On Servlet ASYNC dispatches the context
+            // may already hold AnonymousAuthenticationToken (non-null), which would skip the old null-check and
+            // leave the thread unauthenticated → AuthorizationDeniedException on streamed endpoints.
+            if (user != null) {
                 UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                         user, null, user.authorities()
                 );

@@ -33,6 +33,11 @@ public class Project {
 
     Boolean isPublic = false;
 
+    // ADDED: Missing owner relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id", nullable = false)
+    User owner;
+
     @CreationTimestamp
     Instant createdAt;
 

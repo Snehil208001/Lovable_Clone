@@ -3,7 +3,7 @@ package com.snehil.project.lovable_clone.controller;
 import com.snehil.project.lovable_clone.dto.project.FileContentResponse;
 import com.snehil.project.lovable_clone.dto.project.FileNode;
 import com.snehil.project.lovable_clone.security.JwtUserPrincipal;
-import com.snehil.project.lovable_clone.service.FileService;
+import com.snehil.project.lovable_clone.service.ProjectFileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,7 +18,7 @@ import java.util.List;
 @RequestMapping("/api/projects/{projectId}/files")
 @RequiredArgsConstructor
 public class FileController {
-    private final FileService fileService;
+    private final ProjectFileService fileService;
 
     @GetMapping
     public ResponseEntity<List<FileNode>> getFileTree(

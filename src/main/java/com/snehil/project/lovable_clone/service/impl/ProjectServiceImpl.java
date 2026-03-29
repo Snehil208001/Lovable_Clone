@@ -49,11 +49,10 @@ public class ProjectServiceImpl implements ProjectService {
                 () -> new ResourceNotFoundException("User", userId.toString())
         );
 
-
-
         Project project = Project.builder()
                 .name(request.name())
                 .isPublic(false)
+                .owner(owner) // ADDED: Set the owner before saving
                 .build();
         project = projectRepository.save(project);
 
