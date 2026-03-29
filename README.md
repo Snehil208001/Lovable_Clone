@@ -16,6 +16,9 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 | Mapping | MapStruct |
 | Build | Maven (wrapper included) |
 | Payments | Stripe Java SDK (`stripe-java`) |
+| AI | Spring AI 2.x (`spring-ai-starter-model-openai`) — OpenAI chat (streaming) |
+| Object storage | MinIO Java client (`io.minio`) for project file buckets |
+| Reactive (client) | Reactor / WebClient (Spring AI OpenAI transport) |
 | Other | Lombok |
 
 ## What’s in the repo
@@ -27,10 +30,13 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 - **Services** — interfaces in `service/` with implementations in `service/impl/` (including **`SubscriptionService`** for billing flows).
 - **Mappers** — `ProjectMapper`, `ProjectMemberMapper`, `UserMapper`, **`SubscriptionMapper`** (MapStruct).
 - **Errors** — `GlobalExceptionHandler`, `ApiError`, custom exceptions under `error/`.
-- **Security** — `WebSecurityConfig` (`@EnableMethodSecurity`), `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`, **`SecurityExpression`** (`@Component("security")`) for **`@PreAuthorize`** on project APIs.
+- **Security** — `WebSecurityConfig` (`@EnableMethodSecurity`), `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`, **`SecurityExpression`** (`@Component("security")`) for **`@PreAuthorize`** on project APIs. **`JwtAuthFilter`** runs on **Servlet async** dispatches and **always** applies a valid `Bearer` token to `SecurityContextHolder` so streaming endpoints (`text/event-stream`) stay authenticated.
+- **AI chat** — `POST /api/chat/stream` returns **SSE** (`Flux<ServerSentEvent<String>>`) via `AiGenerationService` / Spring AI **OpenAI** (configure **`OPENAI_API_KEY`** and network/DNS access to the API host).
+- **Config** — `AiConfig`, `StorageConfig` (MinIO); **`services.docker-compose.yml`** for local **PostgreSQL (pgvector)** and **MinIO**.
+- **Project files** — `ProjectFileService` / `ProjectFileServiceImpl`, `ProjectFileRepository`, `ProjectFileMapper` (evolved from earlier `FileService`).
 - **Roles & permissions** — `ProjectRole` (**OWNER**, **EDITOR**, **VIEWER**) maps to **`ProjectPermission`** (view, edit, delete, manage members, view members); used by **`SecurityExpression`** and **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
 
-Configure the database and secrets locally: **`application.yml`** uses environment variables—set **`DB_PASSWORD`**, **`JWT_SECRET_KEY`**, **`STRIPE_API_KEY`**, **`STRIPE_WEBHOOK_SECRET`** (and configure **`client.url`** in that file for Stripe redirects). **Do not commit real API keys** to version control.
+Configure the database and secrets locally: **`application.yml`** expects **`DB_PASSWORD`**, **`JWT_SECRET_KEY`**, **`OPENAI_API_KEY`** (for chat streaming), **`STRIPE_API_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, and **`minio.*`** (URL + credentials; align the MinIO port with Docker or your install). **Do not commit real API keys** to version control.
 
 ## Completed work (explained)
 
@@ -47,7 +53,7 @@ This section describes **what is actually implemented end-to-end** today—not o
 
 - **Stateless** HTTP sessions (`SessionCreationPolicy.STATELESS`), **CSRF disabled** (API + Bearer tokens).
 - **`@EnableMethodSecurity`** — project services use **`@PreAuthorize`** with SpEL such as **`@security.canViewProject(#id)`**, **`@security.canEditProject(#id)`**, **`@security.canManageMembers(#projectId)`**, where **`security`** is the **`SecurityExpression`** bean. It resolves the current user from the JWT context and checks **`ProjectRole`** permissions via **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
-- **`POST /api/auth/signup`**, **`POST /api/auth/login`**, and **`POST /webhooks/**`** (Stripe signature verification) are **public** (`permitAll`). **Every other `/api/**` route** (including **`GET /api/auth/me`**) requires a valid **`Authorization: Bearer <JWT>`**; **`JwtAuthFilter`** validates the token and sets **`JwtUserPrincipal`**. Controllers use **`@AuthenticationPrincipal JwtUserPrincipal`** (user id from token claims).
+- **`POST /api/auth/signup`**, **`POST /api/auth/login`**, and **`POST /webhooks/**`** (Stripe signature verification) are **public** (`permitAll`). **Every other `/api/**` route** (including **`GET /api/auth/me`** and **`POST /api/chat/stream`**) requires a valid **`Authorization: Bearer <JWT>`**; **`JwtAuthFilter`** validates the token and sets **`JwtUserPrincipal`**. For **SSE/async** requests the filter still runs on **async dispatch** (`shouldNotFilterAsyncDispatch = false`) so the principal is not lost after the response commits. Controllers use **`@AuthenticationPrincipal JwtUserPrincipal`** (user id from token claims).
 - **`BCryptPasswordEncoder`** for **password hashing** (signup and login).
 
 #### API errors (`error/` + `GlobalExceptionHandler`)
@@ -129,8 +135,9 @@ Access is **membership-based** via **`ProjectMember`**, not a denormalized `owne
 ### 10. What exists but is not “done” yet
 
 - **Billing** — **Stripe** checkout URLs (**`PaymentProcessor`** / **`StripePaymentProcessor`**), **`PaymentConfig`**, and **`POST /webhooks/payment`** are wired; **customer portal** and deep subscription persistence may still be partial; **set Stripe env vars** before calling live APIs.
-- **Files, usage** — routes exist; some **`service/impl`** methods still return **`null`** or **empty lists**.
-- **Chat, preview, ZIP download, SSE streams** — **not implemented** (no controllers for those spec paths yet).
+- **Files** — file tree/content APIs exist; **MinIO** is configurable for persistence; behavior may still be partial vs. production file storage.
+- **Chat** — **`POST /api/chat/stream`** (SSE) is implemented with Spring AI + OpenAI; **chat session CRUD**, **history**, and **retry** flows are not fully implemented yet.
+- **Preview, ZIP download** — preview runner and **`download-zip`** are not implemented.
 
 ---
 
@@ -161,6 +168,7 @@ Base URL (local): `http://localhost:8080`
 | Webhooks | `POST` | `/webhooks/payment` |
 | Usage | `GET` | `/api/usage/today` |
 | Usage | `GET` | `/api/usage/limits` |
+| Chat (AI) | `POST` | `/api/chat/stream` — **SSE** (`text/event-stream`); JSON body **`{ "message": "...", "projectId": <long> }`** + **`Authorization: Bearer <JWT>`** |
 
 ## Domain model (conceptual)
 
@@ -176,26 +184,55 @@ Plan ──< Subscription ──> User
 
 ## Prerequisites
 
-- Java 21  
-- Maven or `./mvnw` / `mvnw.cmd`  
-- PostgreSQL (e.g. Docker on `localhost:9000` → container `5432`)
+- **Java 21**
+- **Maven** or `./mvnw` / `mvnw.cmd`
+- **PostgreSQL** (local install or Docker)
+- **OpenAI API key** if you use **`POST /api/chat/stream`** (outbound HTTPS/DNS must work from the machine running the app)
+- **MinIO** (optional for file features; Docker compose below includes it)
+
+## Local dependencies (Docker)
+
+From the repo root:
+
+```bash
+docker compose -f services.docker-compose.yml up -d
+```
+
+This starts:
+
+- **PostgreSQL (pgvector)** — host port **`9010`** → container `5432`, DB `pgvector-test`, user `user` (set **`DB_PASSWORD`** to match **`POSTGRES_PASSWORD`** in the compose file, e.g. `password`).
+- **MinIO** — API on host **`9002`** (mapped from container `9000`), console on **`9001`**. Set **`minio.url`** in **`application.yml`** to **`http://localhost:9002`** when using this compose file (adjust if you run MinIO elsewhere).
 
 ## Configuration
 
-Example configuration shape (use **environment variables** for secrets in shared or production environments):
+Secrets and environment-specific values belong in env vars or a local override—not committed keys.
+
+**Required / common variables**
+
+| Variable | Purpose |
+|----------|---------|
+| `DB_PASSWORD` | PostgreSQL password |
+| `JWT_SECRET_KEY` | Signing key for JWT access tokens |
+| `OPENAI_API_KEY` | OpenAI API for chat streaming |
+| `STRIPE_API_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe (if using billing webhooks/checkout) |
+
+**Example shape** (see committed **`application.yml`** for the live structure):
 
 ```yaml
 spring:
   application:
     name: lovable-clone
   datasource:
-    url: jdbc:postgresql://localhost:9000/your_database
-    username: your_username
+    url: jdbc:postgresql://localhost:9010/pgvector-test
+    username: user
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: update
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
@@ -206,9 +243,13 @@ stripe:
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET}
 
-# Committed app may use a flat key, e.g. client.url: http://localhost:8080
-client:
-  url: ${CLIENT_URL:http://localhost:8080}
+client.url: http://localhost:8080
+
+minio:
+  url: http://localhost:9002
+  access-key: minioadmin
+  secret-key: minioadmin123
+  project-bucket: projects
 ```
 
 ## Run
@@ -232,6 +273,7 @@ src/main/java/com/snehil/project/lovable_clone/
 ├── entity/
 ├── enums/
 ├── error/
+├── llm/
 ├── mapper/
 ├── repository/
 ├── security/
@@ -265,13 +307,14 @@ src/main/java/com/snehil/project/lovable_clone/
 - [ ] List chat sessions
 - [ ] Create new chat session
 - [ ] Load full chat history
-- [ ] Chat stream (SSE)
+- [x] Chat stream (SSE) — **`POST /api/chat/stream`** with Bearer JWT + JSON **`message`**, **`projectId`**
+- OpenAI calls require **`OPENAI_API_KEY`** and working DNS/network to the provider.
 - [ ] Retry if failed
 
 **Files**
 
-- [ ] Get file tree & metadata *(route: `GET /api/projects/{id}/files`)*
-- [ ] Get file content *(route: `GET /api/projects/{id}/files/**`)*
+- [ ] Get file tree & metadata *(route exists; service/storage integration evolving)*
+- [ ] Get file content *(route exists; service/storage integration evolving)*
 - [ ] Download all files as ZIP *(no `.../download-zip` route yet)*
 
 **Preview**
@@ -294,11 +337,11 @@ src/main/java/com/snehil/project/lovable_clone/
 |------|------|-------------|
 | Auth | `POST /api/auth/login`, `POST /api/auth/signup`, `GET /api/auth/me` | JWT auth; signup/login/me implemented |
 | Projects | CRUD `/api/projects/{id}`, `GET /api/projects` | Yes (projects CRUD + list) |
-| Files | Tree, file by path, `GET .../download-zip` | Tree + path routes · stubs · **no** download-zip |
+| Files | Tree, file by path, `GET .../download-zip` | Tree + path routes · **`ProjectFileService`** / MinIO config · **no** download-zip |
 | Members | `GET/POST/PATCH/DELETE` `/api/projects/{id}/members...` | Yes (persistence + rules) |
 | Plans & billing | `GET /api/plans`, `GET /api/me/subscription`, `POST /api/payments/checkout`, `POST /api/payments/portal`, `POST /webhooks/payment` | Stripe SDK + checkout; webhook handler; subscription/portal evolving |
 | Usage | `GET /api/usage/today`, `GET /api/usage/limits` | Routes yes · logic no |
-| Chat & AI | `.../chat-sessions`, messages, `POST /api/chat/stream` (SSE) | **Not implemented** |
+| Chat & AI | `.../chat-sessions`, messages, `POST /api/chat/stream` (SSE) | **SSE chat implemented**; session/history APIs **not yet** |
 | Preview & runner | `POST .../preview`, preview status, logs SSE, `DELETE .../preview` | **Not implemented** |
 
 ### Future work
@@ -310,7 +353,8 @@ src/main/java/com/snehil/project/lovable_clone/
 - [x] Global exception handling & validation errors *(see `GlobalExceptionHandler`)*
 - [x] Spring Security + JWT *(password encoder, `JwtAuthFilter`, protected `/api/**` except auth)*
 - [x] Stripe integration & webhooks *(baseline: checkout, `PaymentConfig`, `POST /webhooks/payment`)*
-- [ ] AI, MinIO, previews, K8s, distributed architecture
+- [x] AI (OpenAI streaming) + MinIO wiring *(baseline: Spring AI + `StorageConfig`)*
+- [ ] Chat sessions/history APIs, previews, K8s, full distributed architecture
 
 ---
 
