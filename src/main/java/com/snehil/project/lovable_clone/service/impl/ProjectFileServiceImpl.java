@@ -9,6 +9,7 @@ import com.snehil.project.lovable_clone.mapper.ProjectFileMapper;
 import com.snehil.project.lovable_clone.repository.ProjectFileRepository;
 import com.snehil.project.lovable_clone.repository.ProjectRepository;
 import com.snehil.project.lovable_clone.service.ProjectFileService;
+import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import lombok.RequiredArgsConstructor;
@@ -36,16 +37,41 @@ public class ProjectFileServiceImpl implements ProjectFileService {
     @Value("${minio.project-bucket}")
     private String projectBucket;
 
+    private static final String BUCKET_NAME = "projects";
+
 
     @Override
-    public List<FileNode> getFileTree(Long projectId, Long userId) {
+    public List<FileNode> getFileTree(Long projectId) {
         List<ProjectFile> projectFilesList = projectFileRepository.findByProjectId(projectId);
         return projectFileMapper.toListOfFileNode(projectFilesList);
     }
 
     @Override
     public FileContentResponse getFileContent(Long projectId, String path, Long userId) {
-        return null;
+        String cleanPath = path.startsWith("/") ? path.substring(1) : path;
+        ProjectFile file = projectFileRepository.findByProjectIdAndPath(projectId, cleanPath)
+                .orElseThrow(() -> new ResourceNotFoundException("File", cleanPath));
+
+        if (file.getContent() != null && !file.getContent().isEmpty()) {
+            return new FileContentResponse(cleanPath, file.getContent());
+        }
+
+        String key = file.getMinioObjectKey();
+        if (key != null && !key.isEmpty()) {
+            try (InputStream stream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(BUCKET_NAME)
+                            .object(key)
+                            .build())) {
+                String body = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+                return new FileContentResponse(cleanPath, body);
+            } catch (Exception e) {
+                log.error("MinIO read failed for project key={}", key, e);
+                throw new ResourceNotFoundException("File content", cleanPath);
+            }
+        }
+
+        throw new ResourceNotFoundException("File content", cleanPath);
     }
 
     @Override
@@ -57,35 +83,46 @@ public class ProjectFileServiceImpl implements ProjectFileService {
         String cleanPath = path.startsWith("/") ? path.substring(1) : path;
         String objectKey = projectId + "/" + cleanPath;
 
+        boolean uploadedToMinio = false;
         try {
             byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
-            InputStream inputStream = new ByteArrayInputStream(contentBytes);
-            // saving the file content
-            minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket(projectBucket)
-                            .object(objectKey)
-                            .stream(inputStream, contentBytes.length, -1)
-                            .contentType(determineContentType(path))
-                            .build());
-
-            // Saving the metaData
-            ProjectFile file = projectFileRepository.findByProjectIdAndPath(projectId, cleanPath)
-                    .orElseGet(() -> ProjectFile.builder()
-                            .project(project)
-                            .path(cleanPath)
-                            .minioObjectKey(objectKey) // Use the key we generated
-                            .createdAt(Instant.now())
-                            .build());
-
-            file.setUpdatedAt(Instant.now());
-            projectFileRepository.save(file);
-            log.info("Saved file: {}", objectKey);
+            try (InputStream inputStream = new ByteArrayInputStream(contentBytes)) {
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(projectBucket)
+                                .object(objectKey)
+                                .stream(inputStream, contentBytes.length, -1)
+                                .contentType(determineContentType(path))
+                                .build());
+            }
+            uploadedToMinio = true;
         } catch (Exception e) {
-            log.error("Failed to save file {}/{}", projectId, cleanPath, e);
-            throw new RuntimeException("File save failed", e);
+            log.warn(
+                    "MinIO upload failed for {}/{} — storing content in database. Check minio.url / that MinIO is running. Cause: {}",
+                    projectId,
+                    cleanPath,
+                    e.getMessage());
         }
 
+        ProjectFile file = projectFileRepository.findByProjectIdAndPath(projectId, cleanPath)
+                .orElseGet(() -> ProjectFile.builder()
+                        .project(project)
+                        .path(cleanPath)
+                        .createdAt(Instant.now())
+                        .build());
+
+        if (uploadedToMinio) {
+            file.setMinioObjectKey(objectKey);
+            file.setContent(null);
+            log.info("Saved file to MinIO: {}", objectKey);
+        } else {
+            file.setMinioObjectKey(null);
+            file.setContent(content);
+            log.info("Saved file in database only: projectId={} path={}", projectId, cleanPath);
+        }
+
+        file.setUpdatedAt(Instant.now());
+        projectFileRepository.save(file);
     }
     private String determineContentType(String path) {
         String type = URLConnection.guessContentTypeFromName(path);

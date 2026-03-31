@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:lovabletest;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  ai:
+    openai:
+      api-key: test-openai-key-placeholder-for-context-load
+
+jwt:
+  secret-key: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+stripe:
+  api:
+    secret: ""
+  webhook:
+    secret: ""
+
+billing:
+  default-plan:
+    stripe-price-id: ""
+
+minio:
+  url: http://127.0.0.1:1
+  region: us-east-1
+  access-key: test
+  secret-key: testsecret
+  project-bucket: test-bucket

@@ -23,7 +23,7 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 
 ## What’s in the repo
 
-- **REST API** — auth, projects, members, files, plans, **Stripe checkout + customer portal (partial)**, subscription APIs, usage stubs, payment webhooks.
+- **REST API** — auth, projects, members, files, plans, **Stripe checkout + customer portal**, subscription APIs, usage stubs, payment webhooks.
 - **DTOs** — request/response records under `dto/` (with validation annotations where used).
 - **Entities & enums** — domain model under `entity/` and `enums/`.
 - **Repositories** — `UserRepository`, `ProjectRepository`, `ProjectMemberRepository`, **`PlanRepository`**, **`SubscriptionRepository`**.
@@ -32,11 +32,11 @@ Spring Boot API inspired by [Lovable](https://lovable.dev): projects, collaborat
 - **Errors** — `GlobalExceptionHandler`, `ApiError`, custom exceptions under `error/`.
 - **Security** — `WebSecurityConfig` (`@EnableMethodSecurity`), `JwtAuthFilter`, `JwtAuthEntryPoint`, `JwtUserPrincipal`, `SecurityUtil`, **`SecurityExpression`** (`@Component("security")`) for **`@PreAuthorize`** on project APIs. **`JwtAuthFilter`** runs on **Servlet async** dispatches and **always** applies a valid `Bearer` token to `SecurityContextHolder` so streaming endpoints (`text/event-stream`) stay authenticated.
 - **AI chat** — `POST /api/chat/stream` returns **SSE** (`Flux<ServerSentEvent<String>>`) via `AiGenerationService` / Spring AI **OpenAI** (configure **`OPENAI_API_KEY`** and network/DNS access to the API host).
-- **Config** — `AiConfig`, `StorageConfig` (MinIO); **`services.docker-compose.yml`** for local **PostgreSQL (pgvector)** and **MinIO**.
+- **Config** — `AiConfig`, **`StorageConfig`** (MinIO client: parsed endpoint + optional **`minio.region`**), **`MinioBucketInitializer`** (creates **`minio.project-bucket`** on startup if MinIO is up), **`BillingPlansInitializer`** (seeds a default plan when the DB is empty and **`STRIPE_DEFAULT_PRICE_ID`** is set).
 - **Project files** — `ProjectFileService` / `ProjectFileServiceImpl`, `ProjectFileRepository`, `ProjectFileMapper` (evolved from earlier `FileService`).
 - **Roles & permissions** — `ProjectRole` (**OWNER**, **EDITOR**, **VIEWER**) maps to **`ProjectPermission`** (view, edit, delete, manage members, view members); used by **`SecurityExpression`** and **`ProjectMemberRepository.findRoleByProjectIdAndUserId`**.
 
-Configure the database and secrets locally: **`application.yml`** expects **`DB_PASSWORD`**, **`JWT_SECRET_KEY`**, **`OPENAI_API_KEY`** (for chat streaming), **`STRIPE_API_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, and **`minio.*`** (URL + credentials; align the MinIO port with Docker or your install). **Do not commit real API keys** to version control.
+Configure the database and secrets locally: **`application.yml`** expects **`DB_PASSWORD`**, **`JWT_SECRET_KEY`**, **`OPENAI_API_KEY`** (for chat streaming), **`STRIPE_API_KEY`**, **`STRIPE_WEBHOOK_SECRET`**, optional **`STRIPE_DEFAULT_PRICE_ID`** (seeds plan id `1` on first run when the `plan` table is empty), and **`minio.*`** (S3 **API** URL, region, access key, secret key, bucket name—**API port ≠ web console port**). **Do not commit real API keys** to version control.
 
 ## Completed work (explained)
 
@@ -134,8 +134,8 @@ Access is **membership-based** via **`ProjectMember`**, not a denormalized `owne
 
 ### 10. What exists but is not “done” yet
 
-- **Billing** — **Stripe** checkout URLs (**`PaymentProcessor`** / **`StripePaymentProcessor`**), **`PaymentConfig`**, and **`POST /webhooks/payment`** are wired; **customer portal** and deep subscription persistence may still be partial; **set Stripe env vars** before calling live APIs.
-- **Files** — file tree/content APIs exist; **MinIO** is configurable for persistence; behavior may still be partial vs. production file storage.
+- **Billing** — **Stripe** checkout (**`StripePaymentProcessor`**) creates checkout sessions; **`POST /api/payments/portal`** opens the customer portal and **creates a Stripe Customer** if the user has no `stripeCustomerId` yet. **`GET /api/plans`** reads **active** plans from the database (**`PlanServiceImpl`** + **`PlanRepository`**). Seed a default plan via **`STRIPE_DEFAULT_PRICE_ID`** / **`billing.default-plan.stripe-price-id`** or insert plans manually. Webhook **`POST /webhooks/payment`** persists customer id and activates subscriptions on **`checkout.session.completed`**. **Set Stripe env vars** for live calls.
+- **Files** — **`GET /api/projects/{projectId}/files`** (tree) and **`GET /api/projects/{projectId}/files/{*path}`** (content) are implemented. **`ProjectFileServiceImpl`** uploads to **MinIO** when reachable; if MinIO fails, file bodies are stored in **`project_files.content`** (PostgreSQL) so chat/codegen and **`read_files`** keep working.
 - **Chat** — **`POST /api/chat/stream`** (SSE) is implemented with Spring AI + OpenAI; **chat session CRUD**, **history**, and **retry** flows are not fully implemented yet.
 - **Preview, ZIP download** — preview runner and **`download-zip`** are not implemented.
 
@@ -192,16 +192,16 @@ Plan ──< Subscription ──> User
 
 ## Local dependencies (Docker)
 
-From the repo root:
+If you maintain a Compose file (e.g. **`services.docker-compose.yml`**) for **PostgreSQL** and **MinIO**, start it from the repo root, for example:
 
 ```bash
 docker compose -f services.docker-compose.yml up -d
 ```
 
-This starts:
+Align **`application.yml`** with your actual published ports:
 
-- **PostgreSQL (pgvector)** — host port **`9010`** → container `5432`, DB `pgvector-test`, user `user` (set **`DB_PASSWORD`** to match **`POSTGRES_PASSWORD`** in the compose file, e.g. `password`).
-- **MinIO** — API on host **`9002`** (mapped from container `9000`), console on **`9001`**. Set **`minio.url`** in **`application.yml`** to **`http://localhost:9002`** when using this compose file (adjust if you run MinIO elsewhere).
+- **PostgreSQL** — this project’s sample URL uses host **`9010`** → DB `pgvector-test`, user `user` (**`DB_PASSWORD`** must match the DB).
+- **MinIO** — point **`minio.url`** at the **S3 API** host port (often container **`9000`** mapped to host **`9002`**). Use **`http://127.0.0.1:<api-port>`** (not the browser **console** port). Optional: **`minio.region: us-east-1`**. The app creates the **`project-bucket`** on startup if MinIO accepts the connection.
 
 ## Configuration
 
@@ -214,7 +214,8 @@ Secrets and environment-specific values belong in env vars or a local override�
 | `DB_PASSWORD` | PostgreSQL password |
 | `JWT_SECRET_KEY` | Signing key for JWT access tokens |
 | `OPENAI_API_KEY` | OpenAI API for chat streaming |
-| `STRIPE_API_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe (if using billing webhooks/checkout) |
+| `STRIPE_API_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe (checkout, portal, webhooks) |
+| `STRIPE_DEFAULT_PRICE_ID` | Stripe **Price** id (e.g. `price_...`); seeds first **`plan`** row when `plan` table is empty |
 
 **Example shape** (see committed **`application.yml`** for the live structure):
 
@@ -243,10 +244,16 @@ stripe:
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET}
 
+billing:
+  default-plan:
+    name: Pro
+    stripe-price-id: ${STRIPE_DEFAULT_PRICE_ID:}
+
 client.url: http://localhost:8080
 
 minio:
-  url: http://localhost:9002
+  url: http://127.0.0.1:9002
+  region: us-east-1
   access-key: minioadmin
   secret-key: minioadmin123
   project-bucket: projects
@@ -261,6 +268,14 @@ mvnw.cmd spring-boot:run
 # macOS / Linux
 ./mvnw spring-boot:run
 ```
+
+## Tests
+
+```bash
+mvn test
+```
+
+Integration smoke test **`LovableCloneApplicationTests`** runs with Spring profile **`test`**: **H2** in-memory database (**`src/test/resources/application-test.yml`**), no real Postgres/MinIO/Stripe required.
 
 ## Project layout
 
@@ -313,8 +328,8 @@ src/main/java/com/snehil/project/lovable_clone/
 
 **Files**
 
-- [ ] Get file tree & metadata *(route exists; service/storage integration evolving)*
-- [ ] Get file content *(route exists; service/storage integration evolving)*
+- [x] Get file tree & metadata *( **`GET .../files`** — backed by **`project_files`** + MinIO when available)*
+- [x] Get file content *( **`GET .../files/{*path}`** — MinIO or inline **`project_files.content`** fallback)*
 - [ ] Download all files as ZIP *(no `.../download-zip` route yet)*
 
 **Preview**
@@ -337,9 +352,9 @@ src/main/java/com/snehil/project/lovable_clone/
 |------|------|-------------|
 | Auth | `POST /api/auth/login`, `POST /api/auth/signup`, `GET /api/auth/me` | JWT auth; signup/login/me implemented |
 | Projects | CRUD `/api/projects/{id}`, `GET /api/projects` | Yes (projects CRUD + list) |
-| Files | Tree, file by path, `GET .../download-zip` | Tree + path routes · **`ProjectFileService`** / MinIO config · **no** download-zip |
+| Files | Tree, file by path, `GET .../download-zip` | Tree + path **implemented** (MinIO + DB fallback) · **no** download-zip |
 | Members | `GET/POST/PATCH/DELETE` `/api/projects/{id}/members...` | Yes (persistence + rules) |
-| Plans & billing | `GET /api/plans`, `GET /api/me/subscription`, `POST /api/payments/checkout`, `POST /api/payments/portal`, `POST /webhooks/payment` | Stripe SDK + checkout; webhook handler; subscription/portal evolving |
+| Plans & billing | `GET /api/plans`, `GET /api/me/subscription`, `POST /api/payments/checkout`, `POST /api/payments/portal`, `POST /webhooks/payment` | Plans from DB + optional seed; checkout + portal (auto Stripe Customer); webhooks |
 | Usage | `GET /api/usage/today`, `GET /api/usage/limits` | Routes yes · logic no |
 | Chat & AI | `.../chat-sessions`, messages, `POST /api/chat/stream` (SSE) | **SSE chat implemented**; session/history APIs **not yet** |
 | Preview & runner | `POST .../preview`, preview status, logs SSE, `DELETE .../preview` | **Not implemented** |

@@ -10,8 +10,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
-import java.awt.*;
-
 @RestController
 @RequiredArgsConstructor
 public class ChatController {
@@ -24,7 +22,7 @@ public class ChatController {
 
         return aiGenerationService.streamResponse(request.message(),request.projectId())
                 .map(data -> ServerSentEvent.<String>builder()
-                        .data(data)
+                        .data(data.text())
                         .build());
     }
 }

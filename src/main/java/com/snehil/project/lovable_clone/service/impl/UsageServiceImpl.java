@@ -13,6 +13,11 @@ public class UsageServiceImpl implements UsageService {
     }
 
     @Override
+    public void recordTokenUsage(Long userId, int actualTokens) {
+
+    }
+
+    @Override
     public PlanLimitsResponse getCurrentSubscriptionLimitsOfUser(Long userId) {
         return null;
     }

@@ -6,6 +6,7 @@ import org.jspecify.annotations.Nullable;
 
 public interface UsageService {
     UsageTodayResponse getTodayUsageOfUser(Long userId);
+    void recordTokenUsage(Long userId, int actualTokens);
 
     PlanLimitsResponse getCurrentSubscriptionLimitsOfUser(Long userId);
 }

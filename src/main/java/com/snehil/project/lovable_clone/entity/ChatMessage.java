@@ -7,6 +7,8 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -36,8 +38,14 @@ public class ChatMessage {
     @Column(nullable = false)
     MessageRole role;
 
+    @Builder.Default
     Integer tokensUsed = 0;
 
     @CreationTimestamp
+    @Column(nullable = false, updatable = false)
     Instant createdAt;
+
+    @OneToMany(mappedBy = "chatMessage", fetch = FetchType.LAZY)
+    @Builder.Default
+    List<ChatEvent> events = new ArrayList<>();
 }

@@ -15,6 +15,7 @@ import com.snehil.project.lovable_clone.repository.ProjectMemberRepository;
 import com.snehil.project.lovable_clone.repository.ProjectRepository;
 import com.snehil.project.lovable_clone.repository.UserRepository;
 import com.snehil.project.lovable_clone.service.ProjectService;
+import com.snehil.project.lovable_clone.service.ProjectTemplateService;
 import com.snehil.project.lovable_clone.service.SubscriptionService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class ProjectServiceImpl implements ProjectService {
     ProjectMapper projectMapper;
     ProjectMemberRepository projectMemberRepository;
     SubscriptionService subscriptionService;
+    ProjectTemplateService projectTemplateService;
 
     @Override
     public ProjectResponse createProject(ProjectRequest request, Long userId) {
@@ -67,6 +69,8 @@ public class ProjectServiceImpl implements ProjectService {
                 .build();
 
         projectMemberRepository.save(projectMember);
+
+        projectTemplateService.initializeProjectFromTemplate(project.getId());
 
         return projectMapper.toProjectResponse(project);
     }

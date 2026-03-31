@@ -6,7 +6,6 @@ import com.snehil.project.lovable_clone.dto.subscriptions.PostalResponse;
 import com.snehil.project.lovable_clone.entity.Plan;
 import com.snehil.project.lovable_clone.entity.User;
 import com.snehil.project.lovable_clone.enums.SubscriptionStatus;
-import com.snehil.project.lovable_clone.error.BadRequestException;
 import com.snehil.project.lovable_clone.error.ResourceNotFoundException;
 import com.snehil.project.lovable_clone.repository.PlanRepository;
 import com.snehil.project.lovable_clone.repository.UserRepository;
@@ -16,6 +15,7 @@ import com.snehil.project.lovable_clone.service.SubscriptionService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.*;
 import com.stripe.model.checkout.Session;
+import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -86,13 +86,9 @@ public class StripePaymentProcessor implements PaymentProcessor {
         // It now correctly updates the method parameter with the authenticated user's ID.
         userId = authUtil.getCurrentUserId();
         User user = getUser(userId);
-        String stripeCustomerId = user.getStripeCustomerId();
-
-        if (stripeCustomerId == null || stripeCustomerId.isEmpty()) {
-            throw new BadRequestException("User does not have a Stripe Customer Id, UserId:" + userId);
-        }
 
         try {
+            String stripeCustomerId = ensureStripeCustomerId(user);
             var portalSession = com.stripe.model.billingportal.Session.create(
                     com.stripe.param.billingportal.SessionCreateParams.builder()
                             .setCustomer(stripeCustomerId)
@@ -104,6 +100,24 @@ public class StripePaymentProcessor implements PaymentProcessor {
             throw new RuntimeException(e);
         }
 
+    }
+
+    /**
+     * Persists a Stripe Customer when missing (e.g. user never completed checkout so webhook never ran).
+     */
+    private String ensureStripeCustomerId(User user) throws StripeException {
+        String existing = user.getStripeCustomerId();
+        if (existing != null && !existing.isEmpty()) {
+            return existing;
+        }
+        CustomerCreateParams params = CustomerCreateParams.builder()
+                .setEmail(user.getUsername())
+                .putMetadata("user_id", user.getId().toString())
+                .build();
+        Customer customer = Customer.create(params);
+        user.setStripeCustomerId(customer.getId());
+        userRepository.save(user);
+        return customer.getId();
     }
 
     @Override

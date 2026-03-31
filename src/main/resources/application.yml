@@ -15,7 +15,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+        format_sql: false
 
   ai:
     openai:
@@ -34,6 +34,12 @@ stripe:
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET}
 
+# First startup with an empty DB: seeds one plan (id 1) when set. Use a Price id from Stripe Dashboard → Products.
+billing:
+  default-plan:
+    name: Pro
+    stripe-price-id: ${STRIPE_DEFAULT_PRICE_ID:}
+
 client.url: http://localhost:8080
 
 logging:
@@ -41,8 +47,13 @@ logging:
     org.springframework.ai:
       chat.client: DEBUG
 
+# S3 API endpoint only (no bucket path). "unexpected end of stream" = wrong port or service not MinIO.
+# API is usually port 9000 inside the container; Docker may publish it as 9002 on the host—use that in minio.url.
+# Console UI is a different port (often 9001)—do not use that as minio.url.
+# When MinIO is unreachable, files still save in Postgres (project_files.content).
 minio:
-  url: http://localhost:9000          # or minio:9000 if inside docker network
+  url: http://127.0.0.1:9002
+  region: us-east-1
   access-key: minioadmin
   secret-key: minioadmin123
   project-bucket: projects

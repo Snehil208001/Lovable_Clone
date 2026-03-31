@@ -19,22 +19,22 @@ import java.time.Instant;
 public class ChatSession {
 
     @EmbeddedId
-    private ChatSessionId id;
+    ChatSessionId id;
 
-    @ManyToOne(fetch = FetchType.LAZY,optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @MapsId("projectId")
-    @JoinColumn(name = "project_id",nullable = false,updatable = false)
+    @JoinColumn(name = "project_id", nullable = false, updatable = false)
     Project project;
 
-    @ManyToOne(fetch = FetchType.LAZY,optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @MapsId("userId")
-    @JoinColumn(name = "user_id",nullable = false,updatable = false)
+    @JoinColumn(name = "user_id", nullable = false, updatable = false)
     User user;
 
     String title;
 
     @CreationTimestamp
-    @Column(nullable = false,updatable = false)
+    @Column(nullable = false, updatable = false)
     Instant createdAt;
 
     @UpdateTimestamp

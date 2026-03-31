@@ -24,7 +24,7 @@ public class FileController {
     public ResponseEntity<List<FileNode>> getFileTree(
             @PathVariable Long projectId,
             @AuthenticationPrincipal JwtUserPrincipal currentUser) {
-        return ResponseEntity.ok(fileService.getFileTree(projectId, currentUser.userId()));
+        return ResponseEntity.ok(fileService.getFileTree(projectId));
     }
 
     @GetMapping("/{*path}")

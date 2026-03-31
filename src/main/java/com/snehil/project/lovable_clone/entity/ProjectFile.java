@@ -31,6 +31,10 @@ public class ProjectFile {
 
     String minioObjectKey;
 
+    /** Inline content when MinIO is unavailable or upload failed; otherwise prefer MinIO via {@link #minioObjectKey}. */
+    @Column(columnDefinition = "text")
+    String content;
+
     @CreationTimestamp
     Instant createdAt;
 
