@@ -19,23 +19,6 @@ A powerful, full-stack AI-powered application generation platform inspired by [L
 - **Stripe Payments**: End-to-end subscription lifecycle management (Checkout, Webhooks, Customer Portal).
 - **Scalable Storage**: MinIO/S3 object storage for project files with a PostgreSQL fallback.
 
-## 🛠️ Tech Stack
-
-### Frontend
-- **Core**: Next.js 14, TypeScript, React
-- **Styling**: Tailwind CSS, Lucide React, Framer Motion
-- **UI Components**: Shadcn/UI, Radix UI
-- **State Management**: Zustand
-- **Preview**: Sandpack React
-
-### Backend
-- **Core**: Java 21, Spring Boot 4.0.4
-- **Security**: Spring Security, JWT (Stateless)
-- **Data**: Spring Data JPA, PostgreSQL, pgvector
-- **AI**: Spring AI (OpenAI transport)
-- **Storage**: MinIO (S3 compatible)
-- **Payments**: Stripe Java SDK
-
 ## 📋 API Overview
 
 Base URL: `http://localhost:8080`
@@ -50,6 +33,33 @@ Base URL: `http://localhost:8080`
 | Billing | `/api/payments/**` | Stripe Checkout & Portal |
 | Usage | `/api/usage/**` | Token & preview monitoring |
 
+## 🛠️ Completed Work (Deep Dive)
+
+This section describes **what is actually implemented end-to-end** today—not only REST routes, but persistence and behavior where applicable.
+
+### 1. Application & Configuration
+- **Spring Boot 4** application with Web, Data JPA, Security, and Validation.
+- **PostgreSQL** via JDBC (pgvector supported).
+- **Hibernate** with `ddl-auto: update` for automatic schema management.
+- **Lombok + MapStruct** for boilerplate reduction and clean DTO mapping.
+
+### 2. Security (`security/`)
+- **Stateless** JWT sessions with **Spring Security**.
+- **@EnableMethodSecurity**: RBAC enforced via SpEL (e.g., `@security.canViewProject(#id)`).
+- **Async Support**: `JwtAuthFilter` correctly handles SSE/async dispatches to keep the principal active during long streams.
+
+### 3. Repositories & Domain Model
+- **Membership-based Access**: Projects are owned/accessed via the `ProjectMember` entity, allowing for real multi-user collaboration.
+- **Optimized Queries**: Repository methods use `EXISTS` and `JOIN` patterns to ensure secure project access at the database level.
+
+### 4. Billing & Payments
+- **Stripe Integration**: Checkout sessions, customer portal creation, and webhook handling.
+- **Plan Seeding**: `BillingPlansInitializer` automatically seeds plans into the database on startup.
+
+### 5. AI & Storage
+- **Streaming Chat**: SSE implementation using Spring AI and OpenAI.
+- **Hybrid Storage**: `ProjectFileService` uploads to MinIO with a PostgreSQL content fallback for maximum reliability.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -57,7 +67,6 @@ Base URL: `http://localhost:8080`
 - Node.js 20+
 - Docker (for PostgreSQL & MinIO)
 - OpenAI API Key
-- Stripe API Key (optional for billing)
 
 ### 1. Setup Infrastructure
 ```bash
@@ -65,11 +74,8 @@ docker compose -f services.docker-compose.yml up -d
 ```
 
 ### 2. Backend Setup
-Copy `src/main/resources/application.yml` and configure your environment variables:
-- `OPENAI_API_KEY`
-- `JWT_SECRET_KEY`
-- `STRIPE_API_KEY`
-- `DB_PASSWORD`
+Configure your environment variables (or `application.yml`):
+- `OPENAI_API_KEY`, `JWT_SECRET_KEY`, `STRIPE_API_KEY`, `DB_PASSWORD`
 
 ```bash
 ./mvnw spring-boot:run
@@ -93,7 +99,6 @@ The app will be available at `http://localhost:5173`.
 - [x] **Usage Guardrails**: Daily token limits and preview slot tracking.
 - [x] **Team Management**: Invite system with role updates.
 - [ ] **Deployment**: One-click Vercel/Netlify integration.
-- [ ] **Custom Domain**: Assign custom domains to project previews.
 
 ## 🔗 Repository
 **GitHub:** [Snehil208001/Lovable_Clone](https://github.com/Snehil208001/Lovable_Clone)
