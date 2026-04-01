@@ -24,6 +24,8 @@ import {
   Settings,
   Smartphone,
   Sparkles,
+  Maximize,
+  Minimize
 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -146,13 +148,6 @@ function languageFromPath(path: string): string {
   }
 }
 
-function encodeFilePath(path: string): string {
-  return path
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-}
-
 function getErrorMessage(error: unknown, fallback: string): string {
   return (error as AxiosError<{ message?: string }>)?.response?.data?.message || fallback;
 }
@@ -166,7 +161,7 @@ function formatChatContent(content: string): string {
   if (!content) return content;
   return content
     .replace(/<file[^>]*path=(["'])([^"']+)\1[^>]*>[\s\S]*?<\/file>/gi, '\n\n📝 Updated $2\n')
-    .replace(/<tool[^>]*>[\s\S]*?<\/tool>/gi, '') // Hide raw tools
+    .replace(/<tool[^>]*>[\s\S]*?<\/tool>/gi, '')
     .replace(/<message[^>]*>([\s\S]*?)<\/message>/gi, '\n$1\n')
     .trim();
 }
@@ -194,6 +189,7 @@ export default function WorkspacePage() {
   const [isSending, setIsSending] = useState(false);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [selectedViewport, setSelectedViewport] = useState<"desktop" | "mobile">("desktop");
+  const [isPreviewMaximized, setIsPreviewMaximized] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [previewFiles, setPreviewFiles] = useState<SandpackFiles>({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(true);
@@ -222,9 +218,7 @@ export default function WorkspacePage() {
   }, [resetWorkspace]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     const rawMessages = window.localStorage.getItem(chatStorageKey);
     const rawSelectedFile = window.localStorage.getItem(selectedFileStorageKey);
@@ -243,70 +237,46 @@ export default function WorkspacePage() {
       }
     }
 
-    if (rawSelectedFile) {
-      setSelectedFilePath(rawSelectedFile);
-    }
+    if (rawSelectedFile) setSelectedFilePath(rawSelectedFile);
 
     if (rawPanels) {
       try {
-        const parsed = JSON.parse(rawPanels) as {
-          isChatCollapsed?: boolean;
-          isCodeCollapsed?: boolean;
-        };
-        if (typeof parsed.isChatCollapsed === "boolean") {
-          setIsChatCollapsed(parsed.isChatCollapsed);
-        }
-        if (typeof parsed.isCodeCollapsed === "boolean") {
-          setIsCodeCollapsed(parsed.isCodeCollapsed);
-        }
-      } catch {
-        // noop
-      }
+        const parsed = JSON.parse(rawPanels) as { isChatCollapsed?: boolean; isCodeCollapsed?: boolean; };
+        if (typeof parsed.isChatCollapsed === "boolean") setIsChatCollapsed(parsed.isChatCollapsed);
+        if (typeof parsed.isCodeCollapsed === "boolean") setIsCodeCollapsed(parsed.isCodeCollapsed);
+      } catch {}
     }
 
     if (rawFolders) {
       try {
         const parsed = JSON.parse(rawFolders) as Record<string, boolean>;
-        if (parsed && typeof parsed === "object") {
-          setExpandedFolders(parsed);
-        }
-      } catch {
-        // noop
-      }
+        if (parsed && typeof parsed === "object") setExpandedFolders(parsed);
+      } catch {}
     }
   }, [chatStorageKey, foldersStorageKey, panelsStorageKey, selectedFileStorageKey, setSelectedFilePath]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(chatStorageKey, JSON.stringify(messages));
     }
-    window.localStorage.setItem(chatStorageKey, JSON.stringify(messages));
   }, [chatStorageKey, messages]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    if (selectedFilePath) {
+    if (typeof window !== "undefined" && selectedFilePath) {
       window.localStorage.setItem(selectedFileStorageKey, selectedFilePath);
     }
   }, [selectedFilePath, selectedFileStorageKey]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(panelsStorageKey, JSON.stringify({ isChatCollapsed, isCodeCollapsed }));
     }
-    window.localStorage.setItem(
-      panelsStorageKey,
-      JSON.stringify({ isChatCollapsed, isCodeCollapsed }),
-    );
   }, [isChatCollapsed, isCodeCollapsed, panelsStorageKey]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(foldersStorageKey, JSON.stringify(expandedFolders));
     }
-    window.localStorage.setItem(foldersStorageKey, JSON.stringify(expandedFolders));
   }, [expandedFolders, foldersStorageKey]);
 
   useEffect(() => {
@@ -314,9 +284,7 @@ export default function WorkspacePage() {
     setExpandedFolders((previous) => {
       const next = { ...previous };
       folderPaths.forEach((folderPath) => {
-        if (typeof next[folderPath] === "undefined") {
-          next[folderPath] = true;
-        }
+        if (typeof next[folderPath] === "undefined") next[folderPath] = true;
       });
       return next;
     });
@@ -351,17 +319,16 @@ export default function WorkspacePage() {
   const loadFileTree = useCallback(
     async (selectFirstFile = false): Promise<string[]> => {
       const response = await ApiClient.getFileTree(projectId);
-      const paths = response.data.map((node) => node.path).sort((a, b) => a.localeCompare(b));
+      const paths = response.data.map((node) => node.path.replace(/^\//, '')).sort((a, b) => a.localeCompare(b));
       setFileTree(paths);
 
       const currentSelected = useWorkspaceStore.getState().selectedFilePath;
-      const defaultSelected = paths[0] || null;
-      const preferredSelected =
-        currentSelected && paths.includes(currentSelected) ? currentSelected : defaultSelected;
-      const nextSelected = selectFirstFile ? preferredSelected : preferredSelected;
-      if (nextSelected) {
-        setSelectedFilePath(nextSelected);
-        await loadFileContent(nextSelected, selectFirstFile);
+      const defaultSelected = paths.find(p => !p.includes('/')) || paths[0] || null;
+      const preferredSelected = currentSelected && paths.includes(currentSelected) ? currentSelected : defaultSelected;
+
+      if (preferredSelected) {
+        setSelectedFilePath(preferredSelected);
+        await loadFileContent(preferredSelected, selectFirstFile);
       } else {
         setSelectedFilePath(null);
         setSelectedFileContent("");
@@ -381,17 +348,19 @@ export default function WorkspacePage() {
         let paths = pathsOverride ?? useWorkspaceStore.getState().fileTree;
         if (!paths.length) {
           const response = await ApiClient.getFileTree(projectId);
-          paths = response.data.map((node) => node.path).sort((a, b) => a.localeCompare(b));
+          paths = response.data.map((node) => node.path.replace(/^\//, '')).sort((a, b) => a.localeCompare(b));
         }
 
-        if (!paths.length) {
+        const filePathsOnly = paths.filter(p => !paths.some(other => other !== p && other.startsWith(p + '/')));
+
+        if (!filePathsOnly.length) {
           setPreviewFiles({});
           setPreviewError("No files available yet to render a preview.");
           return;
         }
 
         const fileEntries = await Promise.allSettled(
-          paths.map(async (path) => {
+          filePathsOnly.map(async (path) => {
             const response = await ApiClient.getFile(projectId, path);
             return [path, response.data.content ?? ""] as const;
           }),
@@ -400,8 +369,28 @@ export default function WorkspacePage() {
         const nextPreviewFiles: SandpackFiles = {};
         fileEntries.forEach((entry) => {
           if (entry.status === "fulfilled") {
-            const [path, content] = entry.value;
-            nextPreviewFiles[`/${path}`] = { code: content };
+            let [path, content] = entry.value;
+            const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+            // Strip out configs that crash the browser Webpack bundler
+            if (
+              normalizedPath.includes("postcss.config") ||
+              normalizedPath.includes("tailwind.config") ||
+              normalizedPath.includes("vite.config")
+            ) {
+              return;
+            }
+
+            // Prevent CSS loaders from trying to resolve Node.js tailwind modules
+            if (normalizedPath.endsWith(".css")) {
+              content = content
+                .replace(/@import\s+['"]tailwindcss.*?['"];?/g, "/* tailwind import removed for CDN */")
+                .replace(/@tailwind\s+base;?/g, "")
+                .replace(/@tailwind\s+components;?/g, "")
+                .replace(/@tailwind\s+utilities;?/g, "");
+            }
+
+            nextPreviewFiles[normalizedPath] = { code: content };
           }
         });
 
@@ -411,37 +400,45 @@ export default function WorkspacePage() {
           return;
         }
 
-        if (!nextPreviewFiles["/index.html"]) {
-          nextPreviewFiles["/index.html"] = {
-            code: `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Generated Preview</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>`,
-          };
+        // Remove generated index.html because react-ts template strictly uses /public/index.html
+        if (nextPreviewFiles["/index.html"]) {
+          delete nextPreviewFiles["/index.html"];
         }
 
+        // Inject the Tailwind Play CDN into the specific public/index.html required by react-ts
+        nextPreviewFiles["/public/index.html"] = {
+          code: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script>
+      tailwind.config = {
+        theme: { extend: {} },
+        // daisyui is handled by the linked CSS file above
+      }
+    </script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>`,
+        };
+
         if (!nextPreviewFiles["/src/main.tsx"] && !nextPreviewFiles["/src/index.tsx"]) {
-          const possibleAppPaths = ["/src/App.tsx", "/src/App.jsx", "/src/Index.tsx", "/src/Index.jsx", "/src/pages/Index.tsx", "/src/pages/Index.jsx", "/pages/Index.tsx"];
+          const possibleAppPaths = ["/src/App.tsx", "/src/App.jsx", "/src/Index.tsx", "/src/Index.jsx"];
           const existingAppPath = possibleAppPaths.find(p => nextPreviewFiles[p]);
-          
           let importPath = "./App";
           let appComponent = "<App />";
-          
+
           if (existingAppPath) {
-             importPath = existingAppPath.replace("/src/", "./").replace("/pages/", "./pages/").replace(".tsx", "").replace(".jsx", "");
+             importPath = existingAppPath.replace("/src/", "./").replace(".tsx", "").replace(".jsx", "");
           } else {
-             appComponent = `<div>
-               <h2>No App Component Found</h2>
-               <p>The AI did not generate an App.tsx or Index.tsx</p>
-             </div>`;
+             appComponent = `<div><h2>No App Component Found</h2></div>`;
           }
 
           nextPreviewFiles["/src/main.tsx"] = {
@@ -457,6 +454,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           };
         }
 
+        // Package.json explicitly strips Node.js tailwind/postcss tools
         if (!nextPreviewFiles["/package.json"]) {
           nextPreviewFiles["/package.json"] = {
             code: JSON.stringify(
@@ -466,13 +464,21 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 private: true,
                 version: "0.0.0",
                 dependencies: {
-                  react: "^19.0.0",
-                  "react-dom": "^19.0.0",
+                  "react": "^18.2.0",
+                  "react-dom": "^18.2.0",
+                  "react-scripts": "^5.0.1",
                   "react-router-dom": "^6.22.0",
                   "@tanstack/react-query": "^5.0.0",
-                  "sonner": "^1.4.0",
-                  "lucide-react": "^0.300.0"
+                  "lucide-react": "^0.300.0",
+                  "clsx": "^2.1.0",
+                  "tailwind-merge": "^2.2.1"
                 },
+                scripts: {
+                  "start": "react-scripts start",
+                  "build": "react-scripts build",
+                  "test": "react-scripts test",
+                  "eject": "react-scripts eject"
+                }
               },
               null,
               2,
@@ -506,7 +512,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
       try {
         const projectResponse = await ApiClient.getProjectById(projectId);
-        
+
         let chatData: ChatHistoryMessage[] = [];
         try {
           const chatResponse = await ApiClient.getChatHistory(projectId);
@@ -515,22 +521,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           console.warn("Chat history not available yet", e);
         }
 
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
 
         setActiveProject(projectResponse.data);
         if (!persistedMessagesRef.current?.length) {
           setMessages(
             chatData.flatMap((message) =>
               isRenderableChatRole(message.role)
-                ? [
-                    {
-                      id: String(message.id),
-                      role: message.role,
-                      content: message.content,
-                    },
-                  ]
+                ? [{ id: String(message.id), role: message.role, content: message.content }]
                 : [],
             ),
           );
@@ -538,21 +536,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         const initialPaths = await loadFileTree(true);
         await refreshPreview(initialPaths);
       } catch (error) {
-        if (mounted) {
-          setWorkspaceError(getErrorMessage(error, "Failed to load workspace."));
-        }
+        if (mounted) setWorkspaceError(getErrorMessage(error, "Failed to load workspace."));
       } finally {
-        if (mounted) {
-          setIsLoadingWorkspace(false);
-        }
+        if (mounted) setIsLoadingWorkspace(false);
       }
     }
 
     void bootstrapWorkspace();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [loadFileTree, projectId, refreshPreview, setActiveProject]);
 
   async function streamAssistantResponse(userPrompt: string, assistantMessageId: string): Promise<string> {
@@ -562,15 +553,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({
-        message: userPrompt,
-        projectId,
-      }),
+      body: JSON.stringify({ message: userPrompt, projectId }),
     });
 
-    if (!response.ok || !response.body) {
-      throw new Error("Streaming request failed");
-    }
+    if (!response.ok || !response.body) throw new Error("Streaming request failed");
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
@@ -579,23 +565,15 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
+      if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
       const events = buffer.split("\n\n");
       buffer = events.pop() || "";
 
       for (const event of events) {
-        const lines = event
-          .split("\n")
-          .map((line) => line.trim())
-          .filter((line) => line.startsWith("data:"));
-
-        if (!lines.length) {
-          continue;
-        }
+        const lines = event.split("\n").map((line) => line.trim()).filter((line) => line.startsWith("data:"));
+        if (!lines.length) continue;
 
         const chunk = lines.map((line) => line.startsWith("data: ") ? line.slice(6) : line.slice(5)).join("\n");
         fullAssistantResponse += chunk;
@@ -616,9 +594,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     event.preventDefault();
 
     const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt || isSending) {
-      return;
-    }
+    if (!trimmedPrompt || isSending) return;
 
     setChatError(null);
     setIsSending(true);
@@ -633,6 +609,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       { id: assistantMessageId, role: "ASSISTANT", content: "" },
     ]);
 
+    // Automatically minimize preview if you send a new prompt
+    if (isPreviewMaximized) {
+      setIsPreviewMaximized(false);
+    }
+
     try {
       const filesBefore = new Set(fileTree);
       const assistantResponse = await streamAssistantResponse(trimmedPrompt, assistantMessageId);
@@ -642,15 +623,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       const maxSyncAttempts = 8;
 
       for (let attempt = 0; attempt < maxSyncAttempts; attempt += 1) {
-        const hasExpectedFiles =
-          expectedFilePaths.length > 0 &&
-          expectedFilePaths.every((path) => latestPaths.includes(path));
-        const hasNewFile = latestPaths.some((path) => !filesBefore.has(path));
-
-        if (hasExpectedFiles) {
-          break;
-        }
-
+        const hasExpectedFiles = expectedFilePaths.length > 0 && expectedFilePaths.every((path) => latestPaths.includes(path));
+        if (hasExpectedFiles) break;
         await delay(800);
         latestPaths = await loadFileTree(false);
       }
@@ -661,10 +635,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       setMessages((previous) =>
         previous.map((message) =>
           message.id === assistantMessageId
-            ? {
-                ...message,
-                content: message.content || "I hit an error while generating a response.",
-              }
+            ? { ...message, content: message.content || "I hit an error while generating a response." }
             : message,
         ),
       );
@@ -674,10 +645,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   }
 
   const previewWidthClass = selectedViewport === "desktop" ? "w-full" : "mx-auto w-[390px]";
-  const selectedLanguage = useMemo(
-    () => languageFromPath(selectedFilePath || ""),
-    [selectedFilePath],
-  );
+  const selectedLanguage = useMemo(() => languageFromPath(selectedFilePath || ""), [selectedFilePath]);
   const chatPanelWidth = isChatCollapsed ? "w-14 min-w-14" : "w-[25%] min-w-[300px] max-w-[420px]";
   const codePanelWidth = isCodeCollapsed ? "w-14 min-w-14" : "w-[25%] min-w-[320px] max-w-[460px]";
 
@@ -690,10 +658,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
     setIsChatCollapsed(false);
     setIsCodeCollapsed(false);
+    setIsPreviewMaximized(false);
     const allFolders = collectFolderPaths(explorerTree);
     setExpandedFolders(Object.fromEntries(allFolders.map((path) => [path, true])));
 
-    const defaultFile = fileTree[0] || null;
+    const defaultFile = fileTree.find(p => !p.includes('/')) || fileTree[0] || null;
     setSelectedFilePath(defaultFile);
     if (defaultFile) {
       void loadFileContent(defaultFile, true);
@@ -701,6 +670,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       setSelectedFileContent("");
     }
   }
+
+  const getActiveFileForSandpack = () => {
+    if (selectedFilePath) {
+      const normalized = selectedFilePath.startsWith("/") ? selectedFilePath : `/${selectedFilePath}`;
+      if (previewFiles[normalized]) return normalized;
+    }
+    if (previewFiles["/src/App.tsx"]) return "/src/App.tsx";
+    if (previewFiles["/src/main.tsx"]) return "/src/main.tsx";
+    return "/public/index.html";
+  };
 
   function renderExplorerNodes(nodes: ExplorerNode[], depth = 0): React.ReactNode {
     return nodes.map((node) => {
@@ -710,20 +689,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <li key={node.path}>
             <button
               type="button"
-              onClick={() =>
-                setExpandedFolders((previous) => ({
-                  ...previous,
-                  [node.path]: !isExpanded,
-                }))
-              }
+              onClick={() => setExpandedFolders((prev) => ({ ...prev, [node.path]: !isExpanded }))}
               className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-xs text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-100"
               style={{ paddingLeft: `${8 + depth * 14}px` }}
             >
-              {isExpanded ? (
-                <ChevronDown className="size-3 text-zinc-500" />
-              ) : (
-                <ChevronRight className="size-3 text-zinc-500" />
-              )}
+              {isExpanded ? <ChevronDown className="size-3 text-zinc-500" /> : <ChevronRight className="size-3 text-zinc-500" />}
               <Folder className="size-3.5 text-zinc-500" />
               <span className="truncate">{node.name}</span>
             </button>
@@ -741,9 +711,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               void loadFileContent(node.path);
             }}
             className={`flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-xs transition ${
-              selectedFilePath === node.path
-                ? "bg-indigo-500/20 text-indigo-100"
-                : "text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100"
+              selectedFilePath === node.path ? "bg-indigo-500/20 text-indigo-100" : "text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100"
             }`}
             style={{ paddingLeft: `${26 + depth * 14}px` }}
           >
@@ -776,42 +744,26 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   }
 
   return (
-    <main className="flex h-screen w-full overflow-hidden bg-zinc-950 text-zinc-100">
+    <main className="flex h-screen w-full overflow-hidden bg-zinc-950 text-zinc-100 relative">
       <section className={`flex h-full flex-col border-r border-white/10 bg-zinc-950 transition-all duration-200 ${chatPanelWidth}`}>
         <header className="border-b border-white/10 px-4 py-3">
           <div className="flex items-center justify-between">
             <Link href="/dashboard" className={`group ${isChatCollapsed ? "hidden" : "block"}`}>
-              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 transition-colors group-hover:text-zinc-400">
-                ← Dashboard
-              </p>
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 transition-colors group-hover:text-zinc-400">← Dashboard</p>
               <h2 className="truncate text-sm font-medium text-zinc-200">{activeProject?.name}</h2>
             </Link>
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`size-8 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 ${isChatCollapsed ? "hidden" : "block"}`}
-                onClick={() => setIsSettingsOpen(true)}
-              >
+              <Button variant="ghost" size="icon" className={`size-8 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 ${isChatCollapsed ? "hidden" : "block"}`} onClick={() => setIsSettingsOpen(true)}>
                 <Settings className="size-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
-                onClick={() => setIsChatCollapsed((value) => !value)}
-              >
+              <Button variant="ghost" size="icon" className="size-8 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100" onClick={() => setIsChatCollapsed((value) => !value)}>
                 {isChatCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
               </Button>
             </div>
           </div>
         </header>
 
-        <ProjectSettingsDialog 
-          projectId={projectId} 
-          open={isSettingsOpen} 
-          onOpenChange={setIsSettingsOpen} 
-        />
+        <ProjectSettingsDialog projectId={projectId} open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
 
         {!isChatCollapsed ? (
         <>
@@ -819,7 +771,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <AnimatePresence initial={false}>
             {messages.map((message) => {
               const isUser = message.role === "USER";
-
               return (
                 <motion.div
                   key={message.id}
@@ -827,18 +778,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.16 }}
-                  className={`rounded-xl border px-3 py-2 text-sm leading-6 ${
-                    isUser
-                      ? "ml-6 border-indigo-300/30 bg-indigo-500/15 text-indigo-50"
-                      : "mr-6 border-white/10 bg-zinc-900/80 text-zinc-200"
-                  }`}
+                  className={`rounded-xl border px-3 py-2 text-sm leading-6 ${isUser ? "ml-6 border-indigo-300/30 bg-indigo-500/15 text-indigo-50" : "mr-6 border-white/10 bg-zinc-900/80 text-zinc-200"}`}
                 >
-                  <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-zinc-400">
-                    {isUser ? "You" : "Assistant"}
-                  </p>
-                  <p className="whitespace-pre-wrap">
-                    {formatChatContent(message.content) || (isSending && !isUser ? "Thinking..." : "")}
-                  </p>
+                  <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-zinc-400">{isUser ? "You" : "Assistant"}</p>
+                  <p className="whitespace-pre-wrap">{formatChatContent(message.content) || (isSending && !isUser ? "Thinking..." : "")}</p>
                 </motion.div>
               );
             })}
@@ -855,102 +798,54 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               className="h-24 w-full resize-none rounded-lg border border-white/10 bg-zinc-900/80 p-3 text-sm text-zinc-100 outline-none transition focus:border-indigo-300/50"
             />
             {chatError ? <p className="text-xs text-red-300">{chatError}</p> : null}
-            <Button
-              type="submit"
-              className="w-full bg-indigo-500 text-white hover:bg-indigo-400"
-              disabled={isSending}
-            >
-              {isSending ? (
-                <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                  Streaming...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 size-4" />
-                  Send
-                  <SendHorizontal className="ml-2 size-4" />
-                </>
-              )}
+            <Button type="submit" className="w-full bg-indigo-500 text-white hover:bg-indigo-400" disabled={isSending}>
+              {isSending ? <><Loader2 className="mr-2 size-4 animate-spin" />Streaming...</> : <><Sparkles className="mr-2 size-4" />Send<SendHorizontal className="ml-2 size-4" /></>}
             </Button>
           </form>
         </div>
         </>
         ) : (
           <div className="flex flex-1 items-start justify-center pt-4">
-            <Link href="/dashboard" className="text-zinc-500 transition-colors hover:text-zinc-300">
-              <Sparkles className="size-4" />
-            </Link>
+            <Link href="/dashboard" className="text-zinc-500 transition-colors hover:text-zinc-300"><Sparkles className="size-4" /></Link>
           </div>
         )}
       </section>
 
-      <section className="flex h-full min-w-[420px] flex-1 flex-col border-r border-white/10 bg-zinc-900/40">
-        <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+      {/* FULLSCREEN FIX APPLIED HERE: When isPreviewMaximized is true, this section absolutely covers the entire screen */}
+      <section className={
+        isPreviewMaximized
+          ? "fixed inset-0 z-50 flex flex-col bg-zinc-950"
+          : "flex h-full min-w-[420px] flex-1 flex-col border-r border-white/10 bg-zinc-900/40"
+      }>
+        <header className="flex items-center justify-between border-b border-white/10 px-4 py-3 bg-zinc-950/80 backdrop-blur-md">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Preview</p>
             <h2 className="text-sm font-medium text-zinc-200">UI Canvas</h2>
           </div>
           <div className="flex items-center gap-2">
             <div className="rounded-lg border border-white/10 bg-zinc-900 p-1">
-              <Button
-                variant={selectedViewport === "desktop" ? "secondary" : "ghost"}
-                size="icon"
-                className="size-8"
-                onClick={() => setSelectedViewport("desktop")}
-              >
-                <Monitor className="size-4" />
-              </Button>
-              <Button
-                variant={selectedViewport === "mobile" ? "secondary" : "ghost"}
-                size="icon"
-                className="size-8"
-                onClick={() => setSelectedViewport("mobile")}
-              >
-                <Smartphone className="size-4" />
-              </Button>
+              <Button variant={selectedViewport === "desktop" ? "secondary" : "ghost"} size="icon" className="size-8" onClick={() => setSelectedViewport("desktop")}><Monitor className="size-4" /></Button>
+              <Button variant={selectedViewport === "mobile" ? "secondary" : "ghost"} size="icon" className="size-8" onClick={() => setSelectedViewport("mobile")}><Smartphone className="size-4" /></Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onResetLayout}
-              className="border-white/10 bg-zinc-900 hover:bg-zinc-800"
-            >
-              <RotateCcw className="mr-2 size-4" />
-              Reset Layout
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void refreshPreview()}
-              className="border-white/10 bg-zinc-900 hover:bg-zinc-800"
-              disabled={isPreviewLoading}
-            >
-              <RefreshCw className="mr-2 size-4" />
-              {isPreviewLoading ? "Refreshing..." : "Refresh"}
+            <Button variant="outline" size="sm" onClick={onResetLayout} className="border-white/10 bg-zinc-900 hover:bg-zinc-800"><RotateCcw className="mr-2 size-4" />Reset Layout</Button>
+            <Button variant="outline" size="sm" onClick={() => void refreshPreview()} className="border-white/10 bg-zinc-900 hover:bg-zinc-800" disabled={isPreviewLoading}><RefreshCw className="mr-2 size-4" />{isPreviewLoading ? "Refreshing..." : "Refresh"}</Button>
+
+            {/* FULLSCREEN TOGGLE BUTTON */}
+            <Button variant="outline" size="icon" className="size-8 border-white/10 bg-zinc-900 hover:bg-zinc-800" onClick={() => setIsPreviewMaximized(!isPreviewMaximized)}>
+              {isPreviewMaximized ? <Minimize className="size-4 text-indigo-400" /> : <Maximize className="size-4 text-zinc-400" />}
             </Button>
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6 relative">
           {isPreviewLoading ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-white/10 bg-zinc-900/70">
-              <div className="flex items-center text-sm text-zinc-300">
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Building preview...
-              </div>
+              <div className="flex items-center text-sm text-zinc-300"><Loader2 className="mr-2 size-4 animate-spin" />Building preview...</div>
             </div>
           ) : previewError ? (
             <div className="flex h-full flex-col items-center justify-center rounded-xl border border-red-400/20 bg-red-500/5 px-6 text-center">
               <p className="text-sm text-red-200">{previewError}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3 border-white/10 bg-zinc-900 hover:bg-zinc-800"
-                onClick={() => void refreshPreview()}
-              >
-                Retry Preview
-              </Button>
+              <Button variant="outline" size="sm" className="mt-3 border-white/10 bg-zinc-900 hover:bg-zinc-800" onClick={() => void refreshPreview()}>Retry Preview</Button>
             </div>
           ) : (
             <motion.div
@@ -966,25 +861,23 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 files={previewFiles}
                 customSetup={{
                   dependencies: {
-                    react: "^19.0.0",
-                    "react-dom": "^19.0.0",
+                    "react": "^18.2.0",
+                    "react-dom": "^18.2.0",
+                    "react-scripts": "^5.0.1",
+                    "lucide-react": "^0.300.0",
+                    "react-router-dom": "^6.22.0",
+                    "@tanstack/react-query": "^5.0.0",
+                    "clsx": "^2.1.0",
+                    "tailwind-merge": "^2.2.1"
                   },
+                  entry: "/src/main.tsx"
                 }}
                 options={{
-                  activeFile:
-                    selectedFilePath && previewFiles[`/${selectedFilePath}`]
-                      ? `/${selectedFilePath}`
-                      : Object.keys(previewFiles).find((f) => f.includes("App")) ||
-                        Object.keys(previewFiles).find((f) => f.endsWith(".tsx")) ||
-                        "/index.html",
+                  activeFile: getActiveFileForSandpack()
                 }}
               >
                 <SandpackLayout style={{ height: "100%", border: "none", background: "transparent" }}>
-                  <SandpackPreview
-                    showOpenInCodeSandbox={false}
-                    showRefreshButton
-                    style={{ height: "100%" }}
-                  />
+                  <SandpackPreview showOpenInCodeSandbox={false} showRefreshButton style={{ height: "100%" }} />
                 </SandpackLayout>
               </SandpackProvider>
             </motion.div>
@@ -1000,12 +893,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </div>
           <div className="flex items-center gap-1">
             {!isCodeCollapsed ? <FolderTree className="size-4 text-zinc-500" /> : null}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
-              onClick={() => setIsCodeCollapsed((value) => !value)}
-            >
+            <Button variant="ghost" size="icon" className="size-8 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100" onClick={() => setIsCodeCollapsed((value) => !value)}>
               {isCodeCollapsed ? <PanelRightOpen className="size-4" /> : <PanelRightClose className="size-4" />}
             </Button>
           </div>
@@ -1014,51 +902,29 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         {!isCodeCollapsed ? (
         <>
         <div className="h-1/2 overflow-y-auto border-b border-white/10 px-3 py-3">
-          {fileTree.length ? (
-            <ul className="space-y-0.5">{renderExplorerNodes(explorerTree)}</ul>
-          ) : (
-            <p className="text-xs text-zinc-500">No generated files yet.</p>
-          )}
+          {fileTree.length ? <ul className="space-y-0.5">{renderExplorerNodes(explorerTree)}</ul> : <p className="text-xs text-zinc-500">No generated files yet.</p>}
         </div>
 
         <div className="relative h-1/2 overflow-auto bg-zinc-950">
           {isLoadingFile ? (
-            <div className="flex h-full items-center justify-center text-zinc-400">
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Loading file...
-            </div>
+            <div className="flex h-full items-center justify-center text-zinc-400"><Loader2 className="mr-2 size-4 animate-spin" />Loading file...</div>
           ) : selectedFilePath ? (
             <>
               <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-zinc-950/95 px-3 py-2 backdrop-blur">
                 <p className="truncate text-xs text-zinc-300">{selectedFilePath}</p>
                 <Code2 className="size-4 text-zinc-500" />
               </div>
-              <SyntaxHighlighter
-                language={selectedLanguage}
-                style={oneDark}
-                customStyle={{
-                  margin: 0,
-                  padding: "14px",
-                  background: "transparent",
-                  fontSize: "12px",
-                  minHeight: "100%",
-                }}
-                wrapLongLines
-              >
+              <SyntaxHighlighter language={selectedLanguage} style={oneDark} customStyle={{ margin: 0, padding: "14px", background: "transparent", fontSize: "12px", minHeight: "100%" }} wrapLongLines>
                 {selectedFileContent || "// Empty file"}
               </SyntaxHighlighter>
             </>
           ) : (
-            <div className="flex h-full items-center justify-center px-6 text-center text-xs text-zinc-500">
-              Select a file from the tree to inspect generated code.
-            </div>
+            <div className="flex h-full items-center justify-center px-6 text-center text-xs text-zinc-500">Select a file from the tree to inspect generated code.</div>
           )}
         </div>
         </>
         ) : (
-          <div className="flex flex-1 items-start justify-center pt-4">
-            <Code2 className="size-4 text-zinc-500" />
-          </div>
+          <div className="flex flex-1 items-start justify-center pt-4"><Code2 className="size-4 text-zinc-500" /></div>
         )}
       </section>
     </main>

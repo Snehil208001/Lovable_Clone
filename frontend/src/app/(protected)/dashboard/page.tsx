@@ -107,21 +107,39 @@ export default function DashboardPage() {
   async function onCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCreateError(null);
+
+    // Validate on frontend before sending to prevent 400 Bad Request
+    const trimmedName = projectName.trim();
+    if (!trimmedName) {
+        setCreateError("Project name cannot be empty.");
+        return;
+    }
+
     setIsCreatingProject(true);
 
     try {
       const response = await ApiClient.createProject({
-        name: projectName,
-        description: projectDescription,
+        name: trimmedName,
+        description: projectDescription.trim(),
       });
       setIsCreateDialogOpen(false);
       setProjectName("");
       setProjectDescription("");
       router.push(`/workspace/${response.data.id}`);
     } catch (err) {
-      const message =
-        (err as AxiosError<{ message?: string }>)?.response?.data?.message ||
-        "Unable to create project right now. Please try again.";
+        const axiosError = err as AxiosError<any>;
+        console.error("Project Creation Error:", axiosError.response?.data);
+
+        let message = "Unable to create project right now. Please try again.";
+
+        // Better error extraction for Spring Boot validation errors
+        if (axiosError.response?.data?.message) {
+             message = axiosError.response.data.message;
+        } else if (axiosError.response?.data?.errors) {
+            // Spring Boot often returns a list of validation errors
+            message = Object.values(axiosError.response.data.errors).join(", ");
+        }
+
       setCreateError(message);
     } finally {
       setIsCreatingProject(false);

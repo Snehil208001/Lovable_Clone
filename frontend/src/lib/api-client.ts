@@ -134,8 +134,10 @@ export const ApiClient = {
 
   // Workspace / Files
   getFileTree: async (projectId: number) => api.get<FileNode[]>(`/api/projects/${projectId}/files`),
-  getFile: async (projectId: number, path: string) => api.get<FileContentResponse>(`/api/projects/${projectId}/files/${encodeURIComponent(path)}`),
-  
+
+  // FIX APPLIED HERE: Removed encodeURIComponent(path)
+  getFile: async (projectId: number, path: string) => api.get<FileContentResponse>(`/api/projects/${projectId}/files/${path}`),
+
   // Chat
   getChatHistory: async (projectId: number) => api.get<ChatResponse[]>(`/api/projects/${projectId}/messages`),
   // Note: streamChat is handled manually via fetch due to EventSource/stream nature
