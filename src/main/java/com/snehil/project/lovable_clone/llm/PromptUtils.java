@@ -98,7 +98,8 @@ public class PromptUtils {
     
             ## 7. Never Do This:
             - Never use emojis, line breaks, etc. in your response. The message tag can only have basic markdown.
-            - Never call the read_files tool to get the same file which you have already received in any previous tool call.\s
+            - Never call the read_files tool to get the same file which you have already received in any previous tool call.
+            - NEVER OUTPUT RAW CODEBLOCKS OUTSIDE OF A <file> TAG. You MUST wrap every single piece of code you create within `<file path="...">...code...</file>`. Code outside XML is IGNORED!
     
             ## 8. Always Do This:
             - Always read the file by using the read_files tool before updating the file content, if the file content is not known by you already.

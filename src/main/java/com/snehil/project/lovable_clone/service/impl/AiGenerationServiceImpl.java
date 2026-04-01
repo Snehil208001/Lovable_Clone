@@ -130,7 +130,7 @@ public class AiGenerationServiceImpl implements AiGenerationService {
 
         ChatMessage assistantChatMessage = ChatMessage.builder()
                 .role(MessageRole.ASSISTANT)
-                .content("Assistant Message here...")
+                .content(fullText)
                 .chatSession(chatSession)
                 .tokensUsed(completionTokens)
                 .build();
@@ -146,7 +146,7 @@ public class AiGenerationServiceImpl implements AiGenerationService {
                 .build());
 
         chatEventList.stream()
-                .filter(e -> e.getType() == ChatEventType.FILE_EDIT)
+                .filter(e -> e.getType() == ChatEventType.FILE_EDIT && e.getFilePath() != null)
                 .forEach(e -> projectFileService.saveFile(projectId, e.getFilePath(), e.getContent()));
 
         chatEventRepository.saveAll(chatEventList);

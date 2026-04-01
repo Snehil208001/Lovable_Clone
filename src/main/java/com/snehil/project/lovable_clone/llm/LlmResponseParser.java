@@ -31,9 +31,9 @@ public class LlmResponseParser {
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL
     );
 
-    // Helper to extract specific attributes (path="..." or args="...") from Group 3
+    // Helper to extract specific attributes (path="..." or path='...') from Group 3
     private static final Pattern ATTRIBUTE_PATTERN = Pattern.compile(
-            "(path|args)=\"([^\"]+)\""
+            "(path|args)=[\"']([^\"']+)[\"']"
     );
 
     public List<ChatEvent> parseChatEvents(String fullResponse, ChatMessage parentMessage) {
@@ -60,7 +60,15 @@ public class LlmResponseParser {
                 case "file" -> {
                     builder.type(ChatEventType.FILE_EDIT);
                     builder.filePath(attrMap.get("path")); // Required for files
-//                    builder.content(null);
+                    
+                    // Strip markdown backticks if present
+                    if (content.startsWith("```")) {
+                        content = content.replaceFirst("^```[a-zA-Z]*\\n?", "");
+                        if (content.endsWith("```")) {
+                            content = content.substring(0, content.length() - 3).trim();
+                        }
+                    }
+                    builder.content(content);
                 }
                 case "tool" -> {
                     builder.type(ChatEventType.TOOL_LOG);

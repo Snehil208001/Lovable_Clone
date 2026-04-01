@@ -53,6 +53,7 @@ public class ProjectServiceImpl implements ProjectService {
 
         Project project = Project.builder()
                 .name(request.name())
+                .description(request.description())
                 .isPublic(false)
                 .owner(owner) // ADDED: Set the owner before saving
                 .build();
@@ -96,6 +97,7 @@ public class ProjectServiceImpl implements ProjectService {
         Project project = getProjectIfAccessibleAndNotDeleted(id, userId);
 
         project.setName(request.name());
+        project.setDescription(request.description());
 
         project = projectRepository.save(project);
         return projectMapper.toProjectResponse(project);

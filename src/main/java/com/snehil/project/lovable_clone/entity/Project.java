@@ -31,6 +31,10 @@ public class Project {
     @Column(nullable = false)
     String name;
 
+    @Column(columnDefinition = "TEXT")
+    String description;
+
+    @Builder.Default
     Boolean isPublic = false;
 
     // ADDED: Missing owner relationship
