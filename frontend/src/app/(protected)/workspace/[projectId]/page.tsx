@@ -837,7 +837,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-6 relative">
+        <div className="flex-1 overflow-auto p-2 relative">
           {isPreviewLoading ? (
             <div className="flex h-full items-center justify-center rounded-xl border border-white/10 bg-zinc-900/70">
               <div className="flex items-center text-sm text-zinc-300"><Loader2 className="mr-2 size-4 animate-spin" />Building preview...</div>
@@ -853,11 +853,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               initial={{ opacity: 0.75, scale: 0.99 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.2 }}
-              className={`${previewWidthClass} h-full rounded-xl border border-white/10 bg-zinc-900/70 p-2 transition-all`}
+              className={`${previewWidthClass} h-full min-h-[800px] rounded-xl border border-white/10 bg-zinc-900/70 p-2 transition-all`}
             >
               <SandpackProvider
                 key={`sandpack-${previewRefreshKey}`}
                 template="react-ts"
+                theme="dark"
                 files={previewFiles}
                 customSetup={{
                   dependencies: {
@@ -876,8 +877,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   activeFile: getActiveFileForSandpack()
                 }}
               >
-                <SandpackLayout style={{ height: "100%", border: "none", background: "transparent" }}>
-                  <SandpackPreview showOpenInCodeSandbox={false} showRefreshButton style={{ height: "100%" }} />
+                <SandpackLayout style={{ height: "100%", minHeight: "800px", border: "none", background: "transparent" }}>
+                  <SandpackPreview showOpenInCodeSandbox={false} showRefreshButton showNavigator={true} style={{ height: "100%", minHeight: "800px" }} />
                 </SandpackLayout>
               </SandpackProvider>
             </motion.div>
