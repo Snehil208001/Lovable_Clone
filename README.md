@@ -1,7 +1,6 @@
 # 🚀 Lovable Clone — Full-Stack AI App Generator
 
 <div align="center">
-  <img src="docs/assets/demo.webp" alt="Lovable Clone Demo Walkthrough" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
 
   <p align="center">
     <b>A powerful, full-stack AI-powered application generation platform inspired by <a href="https://lovable.dev">Lovable</a>.</b><br />
@@ -36,15 +35,7 @@
 - **🔒 Stateful & Stateless Security**: JWT-based session filters and method-level access control (@EnableMethodSecurity).
 - **📂 MinIO Hybrid File Storage**: High-performance object storage for project file trees with a PostgreSQL database fallback.
 
----
 
-## 📸 Application Demo
-
-The animation above showcases the user flow end-to-end:
-1. **Seamless Sign Up & Login** (JWT authentication).
-2. **Dashboard Project Creation** (metadata persistence & project seeding).
-3. **Workspace File Tree & Code Editor** (exploring files, real-time code preview).
-4. **Subscription Plan Upgrades** (Stripe-ready pricing layout).
 
 ---
 
