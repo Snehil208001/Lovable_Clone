@@ -6,6 +6,7 @@ import com.snehil.project.lovable_clone.dto.subscriptions.PostalResponse;
 import com.snehil.project.lovable_clone.entity.Plan;
 import com.snehil.project.lovable_clone.entity.User;
 import com.snehil.project.lovable_clone.enums.SubscriptionStatus;
+import com.snehil.project.lovable_clone.error.BadRequestException;
 import com.snehil.project.lovable_clone.error.ResourceNotFoundException;
 import com.snehil.project.lovable_clone.repository.PlanRepository;
 import com.snehil.project.lovable_clone.repository.UserRepository;
@@ -59,8 +60,8 @@ public class StripePaymentProcessor implements PaymentProcessor {
                                         .build())
                                 .build()
                 )
-                .setSuccessUrl(frontendUrl + "/success.html?session_id={CHECKOUT_SESSION_ID}")
-                .setCancelUrl(frontendUrl + "/cancel.html")
+                .setSuccessUrl(frontendUrl + "/billing?status=success&session_id={CHECKOUT_SESSION_ID}")
+                .setCancelUrl(frontendUrl + "/billing?status=cancelled")
                 .putMetadata("user_id",userId.toString())
                 .putMetadata("plan_id",plan.getId().toString());
         try {
@@ -76,7 +77,8 @@ public class StripePaymentProcessor implements PaymentProcessor {
             Session session = Session.create(params.build());
             return new CheckoutResponse(session.getUrl());
         } catch (StripeException e) {
-            throw new RuntimeException(e);
+            log.error("Stripe checkout failed for plan {} (price {})", plan.getId(), plan.getStripePriceId(), e);
+            throw new BadRequestException("Payment provider rejected the checkout: " + stripeErrorMessage(e));
         }
     }
 
@@ -92,12 +94,13 @@ public class StripePaymentProcessor implements PaymentProcessor {
             var portalSession = com.stripe.model.billingportal.Session.create(
                     com.stripe.param.billingportal.SessionCreateParams.builder()
                             .setCustomer(stripeCustomerId)
-                            .setReturnUrl(frontendUrl)
+                            .setReturnUrl(frontendUrl + "/billing")
                             .build()
             );
             return new PostalResponse(portalSession.getUrl());
         } catch (StripeException e) {
-            throw new RuntimeException(e);
+            log.error("Stripe customer portal session failed for user {}", userId, e);
+            throw new BadRequestException("Payment provider rejected the portal request: " + stripeErrorMessage(e));
         }
 
     }
@@ -229,6 +232,11 @@ public class StripePaymentProcessor implements PaymentProcessor {
     private User getUser(Long userId) {
         return userRepository.findById(userId).orElseThrow(() ->
                 new ResourceNotFoundException("user", userId.toString()));
+    }
+
+    // getStripeError() is null for connection-level failures.
+    private String stripeErrorMessage(StripeException e) {
+        return e.getStripeError() != null ? e.getStripeError().getMessage() : e.getMessage();
     }
     private SubscriptionStatus mapStripeStatusToEnum(String status) {
         return switch (status) {

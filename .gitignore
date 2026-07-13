@@ -35,3 +35,10 @@ build/
 ### Local secrets (override in this file; never commit real keys) ###
 application-local.yml
 **/application-local.yml
+
+testsprite_tests\tmp\config.json
+
+# Local tool files & logs
+.claude/
+*.log
+testsprite_tests/

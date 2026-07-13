@@ -66,7 +66,8 @@ public class BillingController {
             @RequestHeader("Stripe-Signature") String sigHeader
     ) {
         try {
-            Event event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
+            // trim guards against stray whitespace in the env var, which silently breaks the HMAC
+            Event event = Webhook.constructEvent(payload, sigHeader, webhookSecret.trim());
 
             EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
             StripeObject stripeObject = null;

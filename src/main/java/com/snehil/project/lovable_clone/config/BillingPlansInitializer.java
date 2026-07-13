@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
  * (so {@code POST /api/payments/checkout} with {@code planId: 1} works on a fresh database).
  */
 @Component
+@Order(1) // before StripePlanPriceValidator, which checks the seeded rows
 @RequiredArgsConstructor
 @Slf4j
 public class BillingPlansInitializer implements ApplicationRunner {

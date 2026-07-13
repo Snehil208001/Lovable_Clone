@@ -37,8 +37,6 @@ public class ProjectFileServiceImpl implements ProjectFileService {
     @Value("${minio.project-bucket}")
     private String projectBucket;
 
-    private static final String BUCKET_NAME = "projects";
-
 
     @Override
     public List<FileNode> getFileTree(Long projectId) {
@@ -60,7 +58,7 @@ public class ProjectFileServiceImpl implements ProjectFileService {
         if (key != null && !key.isEmpty()) {
             try (InputStream stream = minioClient.getObject(
                     GetObjectArgs.builder()
-                            .bucket(BUCKET_NAME)
+                            .bucket(projectBucket)
                             .object(key)
                             .build())) {
                 String body = new String(stream.readAllBytes(), StandardCharsets.UTF_8);

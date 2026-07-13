@@ -58,7 +58,17 @@ export default function BillingPage() {
   const [checkoutLoadingId, setCheckoutLoadingId] = useState<number | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const searchParams = useSearchParams();
-  const checkoutStatus = searchParams.get("status");
+  const [checkoutStatus, setCheckoutStatus] = useState<string | null>(null);
+
+  // Capture the checkout outcome Stripe redirected back with, then strip the
+  // query param so a refresh or bookmark doesn't re-show a stale banner.
+  useEffect(() => {
+    const status = searchParams.get("status");
+    if (status) {
+      setCheckoutStatus(status);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [searchParams]);
 
   const initials = useMemo(() => {
     const source = user?.name || user?.username || "U";

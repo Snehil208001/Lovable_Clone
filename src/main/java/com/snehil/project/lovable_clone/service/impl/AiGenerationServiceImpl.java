@@ -2,12 +2,9 @@ package com.snehil.project.lovable_clone.service.impl;
 
 import com.snehil.project.lovable_clone.dto.chat.StreamResponse;
 import com.snehil.project.lovable_clone.entity.*;
-import com.snehil.project.lovable_clone.enums.ChatEventType;
-import com.snehil.project.lovable_clone.enums.MessageRole;
 import com.snehil.project.lovable_clone.error.ResourceNotFoundException;
 import com.snehil.project.lovable_clone.llm.PromptUtils;
 import com.snehil.project.lovable_clone.llm.advisors.FileTreeContextAdvisor;
-import com.snehil.project.lovable_clone.llm.LlmResponseParser;
 import com.snehil.project.lovable_clone.llm.tools.CodeGenerationTools;
 import com.snehil.project.lovable_clone.repository.*;
 import com.snehil.project.lovable_clone.security.AuthUtil;
@@ -23,10 +20,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -39,22 +34,18 @@ public class AiGenerationServiceImpl implements AiGenerationService {
     private final FileTreeContextAdvisor fileTreeContextAdvisor;
     private final ChatSessionRepository chatSessionRepository;
     private final ProjectRepository projectRepository;
-    private final LlmResponseParser llmResponseParser;
     private final UserRepository userRepository;
-    private final ChatMessageRepository chatMessageRepository;
-    private final ChatEventRepository chatEventRepository;
     private final UsageService usageService;
-
-    private static final Pattern FILE_TAG_PATTERN = Pattern.compile("<file path=\"([^\"]+)\">(.*?)</file>", Pattern.DOTALL);
+    private final ChatFinalizerService chatFinalizerService;
 
     @Override
     @PreAuthorize("@security.canEditProject(#projectId)")
     public Flux<StreamResponse> streamResponse(String userMessage, Long projectId) {
 
-//        usageService.checkDailyTokensUsage();
-
         Long userId = authUtil.getCurrentUserId();
-        ChatSession chatSession = createChatSessionIfNotExists(projectId, userId);
+        usageService.checkDailyTokenLimit(userId);
+
+        createChatSessionIfNotExists(projectId, userId);
 
         Map<String, Object> advisorParams = Map.of(
                 "userId", userId,
@@ -94,62 +85,20 @@ public class AiGenerationServiceImpl implements AiGenerationService {
                 })
                 .doOnComplete(() -> {
                     Schedulers.boundedElastic().schedule(() -> {
-//                        parseAndSaveFiles(fullResponseBuffer.toString(), projectId);
-
                         long duration = (endTime.get() - startTime.get()) /  1000;
-                        finalizeChats(userMessage, chatSession, fullResponseBuffer.toString(), duration, usageRef.get());
+                        try {
+                            chatFinalizerService.finalizeChat(projectId, userId, userMessage,
+                                    fullResponseBuffer.toString(), duration, usageRef.get());
+                        } catch (Exception e) {
+                            log.error("Failed to persist chat generation for projectId: {}", projectId, e);
+                        }
                     });
                 })
-                .doOnError(error -> log.error("Error during streaming for projectId: {}", projectId))
+                .doOnError(error -> log.error("Error during streaming for projectId: {}", projectId, error))
                 .map(response -> {
                     String text = response.getResult().getOutput().getText();
                     return new StreamResponse(text != null ? text : "");
                 });
-    }
-
-    private void finalizeChats(String userMessage, ChatSession chatSession, String fullText, Long duration, Usage usage) {
-        Long projectId = chatSession.getProject().getId();
-
-        if(usage != null) {
-            int totalTokens = usage.getTotalTokens();
-            usageService.recordTokenUsage(chatSession.getUser().getId(), totalTokens);
-        }
-
-        Integer promptTokens = usage != null ? usage.getPromptTokens() : 0;
-        Integer completionTokens = usage != null ? usage.getCompletionTokens() : 0;
-
-        // Save the User message
-        chatMessageRepository.save(
-                ChatMessage.builder()
-                        .chatSession(chatSession)
-                        .role(MessageRole.USER)
-                        .content(userMessage)
-                        .tokensUsed(promptTokens)
-                        .build()
-        );
-
-        ChatMessage assistantChatMessage = ChatMessage.builder()
-                .role(MessageRole.ASSISTANT)
-                .content(fullText)
-                .chatSession(chatSession)
-                .tokensUsed(completionTokens)
-                .build();
-
-        assistantChatMessage = chatMessageRepository.save(assistantChatMessage);
-
-        List<ChatEvent> chatEventList = llmResponseParser.parseChatEvents(fullText, assistantChatMessage);
-        chatEventList.addFirst(ChatEvent.builder()
-                .type(ChatEventType.THOUGHT)
-                .chatMessage(assistantChatMessage)
-                .content("Thought for "+duration+"s")
-                .sequenceOrder(0)
-                .build());
-
-        chatEventList.stream()
-                .filter(e -> e.getType() == ChatEventType.FILE_EDIT && e.getFilePath() != null)
-                .forEach(e -> projectFileService.saveFile(projectId, e.getFilePath(), e.getContent()));
-
-        chatEventRepository.saveAll(chatEventList);
     }
 
     private ChatSession createChatSessionIfNotExists(Long projectId, Long userId) {

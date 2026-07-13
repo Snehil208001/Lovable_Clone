@@ -20,3 +20,11 @@ export interface ChatHistoryMessage {
   tokensUsed: number | null;
   createdAt: string;
 }
+
+export interface ChatMessage {
+  id: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+}
+
+export type { ExplorerNode } from "@/lib/workspace/explorer-tree";

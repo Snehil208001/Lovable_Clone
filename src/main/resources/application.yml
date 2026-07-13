@@ -8,9 +8,15 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
+  flyway:
+    enabled: true
+    # Existing databases (created by the old ddl-auto: update) are baselined at version 1,
+    # so V1__baseline.sql is skipped there; fresh/empty databases execute it.
+    baseline-on-migrate: true
+
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -19,11 +25,20 @@ spring:
 
   ai:
     openai:
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
       api-key: ${OPENAI_API_KEY}
       chat:
         options:
-          model: gpt-4o
-          temperature: 0.0
+          # Generation quality is capped by this model. gpt-4.1-mini is the cost/quality
+          # sweet spot (~$0.05 per full app generation); set OPENAI_MODEL=gpt-4.1 for
+          # higher quality at ~4x the cost. Avoid gpt-5/o-series here: they reject
+          # max_tokens/temperature params as configured below.
+          model: ${OPENAI_MODEL:gpt-4.1-mini}
+          # 0.0 produces the most conservative, generic UI code; ~0.7 is the sweet spot for design work.
+          temperature: ${OPENAI_TEMPERATURE:0.7}
+          # Multi-screen apps stream 15-30k output tokens; without this the provider
+          # default can truncate the response mid-file.
+          max-tokens: ${OPENAI_MAX_TOKENS:20000}
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
@@ -34,13 +49,16 @@ stripe:
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET}
 
+
 # First startup with an empty DB: seeds one plan (id 1) when set. Use a Price id from Stripe Dashboard → Products.
 billing:
   default-plan:
     name: Pro
     stripe-price-id: ${STRIPE_DEFAULT_PRICE_ID:}
 
-client.url: http://localhost:8080
+# The Next.js frontend origin (dev server runs `next dev -p 5173`); Stripe
+# checkout redirects back to {client.url}/billing?status=... after payment.
+client.url: ${CLIENT_URL:http://localhost:5173}
 
 logging:
   level:

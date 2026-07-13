@@ -9,4 +9,6 @@ public interface UsageService {
     void recordTokenUsage(Long userId, int actualTokens);
 
     PlanLimitsResponse getCurrentSubscriptionLimitsOfUser(Long userId);
+
+    void checkDailyTokenLimit(Long userId);
 }

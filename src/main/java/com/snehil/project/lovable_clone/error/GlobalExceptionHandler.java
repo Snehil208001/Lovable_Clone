@@ -61,6 +61,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(apiError.status()).body(apiError);
     }
 
+    // Upstream AI provider (OpenRouter) rejected or failed the request — surface the real
+    // cause instead of a generic 500 so a bad OPENROUTER_API_KEY is diagnosable from the UI.
+    @ExceptionHandler(org.springframework.web.reactive.function.client.WebClientResponseException.class)
+    public ResponseEntity<ApiError> handleAiProviderError(
+            org.springframework.web.reactive.function.client.WebClientResponseException ex) {
+        String detail;
+        if (ex.getStatusCode().value() == 401) {
+            detail = "AI provider rejected the API key (401 Unauthorized). Check the OPENROUTER_API_KEY environment variable.";
+        } else if (ex.getStatusCode().value() == 429) {
+            detail = "AI provider rate limit exceeded (429 Too Many Requests). The free model is congested or out of credits. Consider upgrading to a paid model or checking your OpenRouter quota/keys.";
+        } else {
+            detail = "AI provider request failed: " + ex.getStatusCode();
+        }
+        ApiError apiError = new ApiError(HttpStatus.BAD_GATEWAY, detail);
+        log.error("AI provider error: {}", ex.getMessage());
+        return ResponseEntity.status(apiError.status()).body(apiError);
+    }
+
     // --- NEWLY ADDED PRODUCTION HANDLERS BELOW ---
 
     // 1. The Global "Catch-All" (500 Internal Server Error)

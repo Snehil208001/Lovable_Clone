@@ -1,107 +1,140 @@
-# Lovable Clone — Full Stack AI App Generator
+# 🚀 Lovable Clone — Full-Stack AI App Generator
 
-A powerful, full-stack AI-powered application generation platform inspired by [Lovable](https://lovable.dev). Build, preview, and deploy applications instantly using natural language.
+<div align="center">
+  <img src="docs/assets/demo.webp" alt="Lovable Clone Demo Walkthrough" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
 
-## 🚀 Features
+  <p align="center">
+    <b>A powerful, full-stack AI-powered application generation platform inspired by <a href="https://lovable.dev">Lovable</a>.</b><br />
+    Build, preview, and deploy full-stack applications instantly using natural language prompts.
+  </p>
+
+  <p align="center">
+    <img src="https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk" alt="Java 21" />
+    <img src="https://img.shields.io/badge/Spring_Boot-4.0-brightgreen?style=for-the-badge&logo=springboot" alt="Spring Boot 4.0" />
+    <img src="https://img.shields.io/badge/Next.js-15-blue?style=for-the-badge&logo=nextdotjs" alt="Next.js 15" />
+    <img src="https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwindcss" alt="Tailwind CSS" />
+    <img src="https://img.shields.io/badge/PostgreSQL-18-blue?style=for-the-badge&logo=postgresql" alt="PostgreSQL" />
+    <img src="https://img.shields.io/badge/Docker-Supported-blue?style=for-the-badge&logo=docker" alt="Docker" />
+  </p>
+</div>
+
+---
+
+## ✨ Features
 
 ### 💻 Modern Frontend
-- **AI Workspace**: Interactive chat interface with real-time SSE streaming for app generation.
-- **Sandpack Preview**: Instant live preview and code editing powered by CodeSandbox Sandpack.
-- **Project Dashboard**: Clean, premium dashboard to manage all your AI-generated projects.
-- **Billing & Usage**: Integrated Stripe subscription management, usage tracking (tokens/previews), and plan comparisons.
-- **Team Collaboration**: Invite members, manage roles (Owner/Editor/Viewer), and collaborate in real-time.
-- **Responsive Design**: Premium dark-mode UI built with Tailwind CSS, Framer Motion, and Shadcn/UI.
+- **🤖 Interactive AI Workspace**: Dynamic chat interface with real-time SSE streaming for instant code generation.
+- **⚡ Live Sandpack Preview**: Real-time app preview and inline code editing powered by CodeSandbox Sandpack.
+- **📊 Premium Dashboard**: Clean, modern dark-mode dashboard to organize and manage all your AI-generated projects.
+- **💳 Stripe Subscription & Billing**: Complete subscription lifecycle management with Stripe Checkout, Webhooks, and Plan Comparisons.
+- **👥 Real-Time Collaboration**: Invite team members, configure RBAC roles (Owner/Editor/Viewer), and build together.
+- **🎨 Elite Dark Theme UI**: Sleek, high-fidelity dark-mode interface built with Tailwind CSS, Framer Motion, and Radix/Shadcn UI.
 
 ### ⚙️ Robust Backend
-- **Spring Boot 4 API**: High-performance RESTful services built with Java 21.
-- **Spring AI Integration**: Orchestrating OpenAI's GPT models for intelligent code generation.
-- **Secure Auth**: JWT-based authentication with role-based access control (RBAC).
-- **Stripe Payments**: End-to-end subscription lifecycle management (Checkout, Webhooks, Customer Portal).
-- **Scalable Storage**: MinIO/S3 object storage for project files with a PostgreSQL fallback.
+- **☕ Spring Boot 4 REST API**: High-throughput RestControllers built with Java 21 and Spring Web.
+- **🧠 Spring AI Integration**: Native integration with OpenAI GPT models for smart code generation.
+- **🔒 Stateful & Stateless Security**: JWT-based session filters and method-level access control (@EnableMethodSecurity).
+- **📂 MinIO Hybrid File Storage**: High-performance object storage for project file trees with a PostgreSQL database fallback.
 
-## 📋 API Overview
+---
 
-Base URL: `http://localhost:8080`
+## 📸 Application Demo
 
-| Area | Path | Description |
-|------|------|-------------|
-| Auth | `/api/auth/**` | Login, Signup, Profile |
-| Projects | `/api/projects/**` | CRUD projects & settings |
-| Members | `/api/projects/{id}/members/**` | Team management |
-| Files | `/api/projects/{id}/files/**` | File tree and content |
-| Chat | `/api/chat/stream` | AI SSE code generation |
-| Billing | `/api/payments/**` | Stripe Checkout & Portal |
-| Usage | `/api/usage/**` | Token & preview monitoring |
+The animation above showcases the user flow end-to-end:
+1. **Seamless Sign Up & Login** (JWT authentication).
+2. **Dashboard Project Creation** (metadata persistence & project seeding).
+3. **Workspace File Tree & Code Editor** (exploring files, real-time code preview).
+4. **Subscription Plan Upgrades** (Stripe-ready pricing layout).
 
-## 🛠️ Completed Work (Deep Dive)
+---
 
-This section describes **what is actually implemented end-to-end** today—not only REST routes, but persistence and behavior where applicable.
+## 📋 API Route Reference
 
-### 1. Application & Configuration
-- **Spring Boot 4** application with Web, Data JPA, Security, and Validation.
-- **PostgreSQL** via JDBC (pgvector supported).
-- **Hibernate** with `ddl-auto: update` for automatic schema management.
-- **Lombok + MapStruct** for boilerplate reduction and clean DTO mapping.
+The backend runs on `http://localhost:8080` by default.
 
-### 2. Security (`security/`)
-- **Stateless** JWT sessions with **Spring Security**.
-- **@EnableMethodSecurity**: RBAC enforced via SpEL (e.g., `@security.canViewProject(#id)`).
-- **Async Support**: `JwtAuthFilter` correctly handles SSE/async dispatches to keep the principal active during long streams.
+| Category | Endpoint | Method | Description |
+| :--- | :--- | :--- | :--- |
+| **Auth** | `/api/auth/login` | `POST` | Authenticate user & return JWT token |
+| **Auth** | `/api/auth/signup` | `POST` | Create a new user account |
+| **Projects**| `/api/projects` | `GET/POST` | List all user projects / Create a new project |
+| **Projects**| `/api/projects/{id}` | `GET/DELETE` | Retrieve project details / Delete project |
+| **Members** | `/api/projects/{id}/members` | `GET/POST` | List members / Invite member to project |
+| **Files** | `/api/projects/{id}/files` | `GET/PUT` | Retrieve file tree / Update file contents |
+| **Chat** | `/api/chat/stream` | `GET` | SSE endpoint for streaming AI code generation |
+| **Billing** | `/api/payments/checkout` | `POST` | Create Stripe Checkout Session |
+| **Usage** | `/api/usage/today` | `GET` | Retrieve daily token and preview slots usage |
 
-### 3. Repositories & Domain Model
-- **Membership-based Access**: Projects are owned/accessed via the `ProjectMember` entity, allowing for real multi-user collaboration.
-- **Optimized Queries**: Repository methods use `EXISTS` and `JOIN` patterns to ensure secure project access at the database level.
+---
 
-### 4. Billing & Payments
-- **Stripe Integration**: Checkout sessions, customer portal creation, and webhook handling.
-- **Plan Seeding**: `BillingPlansInitializer` automatically seeds plans into the database on startup.
+## 🛠️ System Architecture & Implementation
 
-### 5. AI & Storage
-- **Streaming Chat**: SSE implementation using Spring AI and OpenAI.
-- **Hybrid Storage**: `ProjectFileService` uploads to MinIO with a PostgreSQL content fallback for maximum reliability.
+Here is a deep dive into the engineering behind Lovable Clone:
+
+### 1. Security & RBAC Guardrails (`security/`)
+- Enforces strict role-based access control (RBAC). For example, a user must be a project member to see or edit its files.
+- Uses `@security.canViewProject(#id)` and `@security.canEditProject(#id)` inside method security annotations.
+- Implements custom `JwtAuthFilter` that properly registers the auth principal during async requests (like Server-Sent Events chat stream).
+
+### 2. Streamlined AI Code Generation (`llm/`, `service/`)
+- Integrates **Spring AI** to construct multi-file code responses.
+- Implements **LlmResponseParser** to parse LLM outputs into structured project files in real-time.
+- Supports streaming of file updates over Server-Sent Events (SSE).
+
+### 3. Subscription & Usage Limits (`stripe/`, `service/`)
+- Automatically seeds default billing plans into the PostgreSQL database at startup via `BillingPlansInitializer`.
+- Monitors daily tokens and active preview usage slots, preventing abuse on free tiers.
+
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Java 21
-- Node.js 20+
-- Docker (for PostgreSQL & MinIO)
-- OpenAI API Key
+- **Java 21** & Maven
+- **Node.js 20+**
+- **Docker & Docker Compose**
+- **OpenAI API Key** (for code generation)
 
-### 1. Setup Infrastructure
+### 1. Launch Infrastructure
+Start PostgreSQL (with pgvector support) and MinIO services:
 ```bash
 docker compose -f services.docker-compose.yml up -d
 ```
 
 ### 2. Backend Setup
-Configure your environment variables (or `application.yml`):
-- `OPENAI_API_KEY`, `JWT_SECRET_KEY`, `STRIPE_API_KEY`, `DB_PASSWORD`
-
+Create your local configuration profile. Copy the template and add your API keys:
 ```bash
-./mvnw spring-boot:run
+cp application-local.yml.example src/main/resources/application-local.yml
+```
+Run the Spring Boot application (using local profile with timezone override to prevent PG timezone conflicts):
+```bash
+$env:DB_PASSWORD="password"; $env:OPENAI_API_KEY="your-openai-key"; $env:SPRING_PROFILES_ACTIVE="local"; $env:MAVEN_OPTS="-Duser.timezone=UTC"; .\mvnw.cmd spring-boot:run
 ```
 
 ### 3. Frontend Setup
+Navigate to the frontend directory, install dependencies, and launch the Next.js development server:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
+Visit the app at **`http://localhost:5173`**.
+
+---
 
 ## 📈 Roadmap & Progress
-
 - [x] **Auth & RBAC**: JWT login/signup with project-level permissions.
-- [x] **Project Management**: Creation, deletion, and settings UI.
-- [x] **AI Generation**: SSE streaming with file-system persistence.
-- [x] **Stripe Integration**: Plan seeding, checkout, and portal flows.
-- [x] **Usage Guardrails**: Daily token limits and preview slot tracking.
-- [x] **Team Management**: Invite system with role updates.
-- [ ] **Deployment**: One-click Vercel/Netlify integration.
+- [x] **Project Management**: Project creation, deletion, and dashboard UI.
+- [x] **AI App Generator**: SSE streaming code generation with file tree persistence.
+- [x] **Sandpack Sandbox**: Live execution of React/Next.js files in-browser.
+- [x] **Stripe Integration**: Plan seeding, checkout redirects, and portal management.
+- [x] **Usage Guardrails**: Token quotas and active preview limits.
+- [x] **Team Collaboration**: Invite system with Owner, Editor, Viewer roles.
+- [ ] **One-Click Deployments**: Direct deployment of generated apps to Vercel/Netlify.
 
-## 🔗 Repository
-**GitHub:** [Snehil208001/Lovable_Clone](https://github.com/Snehil208001/Lovable_Clone)
+---
 
-## 📄 License
-Educational and personal use only.
+## 🔗 Project Info & License
+- **Repository:** [Snehil208001/Lovable_Clone](https://github.com/Snehil208001/Lovable_Clone)
+- **License:** Educational and personal use only.
+

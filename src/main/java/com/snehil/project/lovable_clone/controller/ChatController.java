@@ -10,12 +10,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
 public class ChatController {
+
+    // Chunks are JSON-encoded because raw SSE framing cannot represent a
+    // token's leading space (parsers strip one space after "data:"), which
+    // silently deletes the whitespace between words in the streamed code.
+    private static final JsonMapper JSON_MAPPER = JsonMapper.builder().build();
 
     private final AiGenerationService aiGenerationService;
     private final ChatService chatService;
@@ -26,7 +32,7 @@ public class ChatController {
 
         return aiGenerationService.streamResponse(request.message(),request.projectId())
                 .map(data -> ServerSentEvent.<String>builder()
-                        .data(data.text())
+                        .data(JSON_MAPPER.writeValueAsString(data.text()))
                         .build());
     }
 

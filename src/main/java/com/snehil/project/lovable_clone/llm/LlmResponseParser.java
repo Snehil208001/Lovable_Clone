@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,38 +18,61 @@ import java.util.regex.Pattern;
 @Slf4j
 public class LlmResponseParser {
 
-    /**
-     * Regex Breakdown:
-     * Group 1: Opening Tag (<tag ...>)
-     * Group 2: Tag Name (message|file|tool)
-     * Group 3: Attributes part (e.g., ' path="foo"' or ' args="a,b"')
-     * Group 4: Content (The stuff inside)
-     * Group 5: Closing Tag (</tag>)
-     */
-
-    private static final Pattern GENERIC_TAG_PATTERN = Pattern.compile(
-            "(<(message|file|tool)([^>]*)>)([\\s\\S]*?)(</\\2>)",
-            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    private static final Pattern OPEN_TAG_PATTERN = Pattern.compile(
+            "<(message|file|tool)((?:\\s[^>]*)?)>",
+            Pattern.CASE_INSENSITIVE
     );
 
-    // Helper to extract specific attributes (path="..." or path='...') from Group 3
+    // Some models close a block with their native tool-call template tag
+    // instead of the protocol's closing tag.
+    private static final String STRAY_CLOSER = "</arg_value>";
+
+    // Helper to extract specific attributes (path="..." or path='...') from the attribute string
     private static final Pattern ATTRIBUTE_PATTERN = Pattern.compile(
             "(path|args)=[\"']([^\"']+)[\"']"
     );
 
+    /**
+     * Splits the response into message/file/tool events. Tolerant of malformed
+     * closings: a block ends at its proper closing tag, a stray {@code </arg_value>},
+     * the next opening tag, or the end of the response — whichever comes first.
+     * A strict {@code <tag>...</tag>} regex silently merges every block whose
+     * closing tag the model botched into the previous file's content.
+     */
     public List<ChatEvent> parseChatEvents(String fullResponse, ChatMessage parentMessage) {
         List<ChatEvent> events = new ArrayList<>();
         int orderCounter = 1;
 
-        Matcher matcher = GENERIC_TAG_PATTERN.matcher(fullResponse);
+        String lowerResponse = fullResponse.toLowerCase(Locale.ROOT);
+        Matcher opener = OPEN_TAG_PATTERN.matcher(fullResponse);
+        int cursor = 0;
 
-        while (matcher.find()) {
-            String tagName = matcher.group(2).toLowerCase();
-            String attributes = matcher.group(3);
-            String content = matcher.group(4).trim();
+        while (opener.find(cursor)) {
+            String tagName = opener.group(1).toLowerCase(Locale.ROOT);
+            Map<String, String> attrMap = extractAttributes(opener.group(2));
+            int contentStart = opener.end();
 
-            // Extract attributes map
-            Map<String, String> attrMap = extractAttributes(attributes);
+            String properCloser = "</" + tagName + ">";
+            int properIdx = lowerResponse.indexOf(properCloser, contentStart);
+            int strayIdx = lowerResponse.indexOf(STRAY_CLOSER, contentStart);
+            Matcher nextOpener = OPEN_TAG_PATTERN.matcher(fullResponse);
+            int nextIdx = nextOpener.find(contentStart) ? nextOpener.start() : -1;
+
+            int contentEnd = fullResponse.length();
+            int resumeAt = fullResponse.length();
+            if (isEarliest(properIdx, strayIdx, nextIdx)) {
+                contentEnd = properIdx;
+                resumeAt = properIdx + properCloser.length();
+            } else if (isEarliest(strayIdx, properIdx, nextIdx)) {
+                contentEnd = strayIdx;
+                resumeAt = strayIdx + STRAY_CLOSER.length();
+            } else if (nextIdx >= 0) {
+                log.warn("Unterminated <{}> block in LLM response; closing it at the next tag", tagName);
+                contentEnd = nextIdx;
+                resumeAt = nextIdx;
+            }
+
+            String content = fullResponse.substring(contentStart, contentEnd).trim();
 
             ChatEvent.ChatEventBuilder builder = ChatEvent.builder()
                     .chatMessage(parentMessage)
@@ -60,7 +84,7 @@ public class LlmResponseParser {
                 case "file" -> {
                     builder.type(ChatEventType.FILE_EDIT);
                     builder.filePath(attrMap.get("path")); // Required for files
-                    
+
                     // Strip markdown backticks if present
                     if (content.startsWith("```")) {
                         content = content.replaceFirst("^```[a-zA-Z]*\\n?", "");
@@ -74,13 +98,25 @@ public class LlmResponseParser {
                     builder.type(ChatEventType.TOOL_LOG);
                     builder.metadata(attrMap.get("args")); // Store raw file list in metadata
                 }
-                default -> { continue; }
+                default -> {
+                    cursor = resumeAt;
+                    continue;
+                }
             }
 
             events.add(builder.build());
+            cursor = resumeAt;
         }
 
         return events;
+    }
+
+    private boolean isEarliest(int candidate, int... others) {
+        if (candidate < 0) return false;
+        for (int other : others) {
+            if (other >= 0 && other < candidate) return false;
+        }
+        return true;
     }
 
     private Map<String, String> extractAttributes(String attributeString) {
@@ -95,4 +131,3 @@ public class LlmResponseParser {
     }
 
 }
-
