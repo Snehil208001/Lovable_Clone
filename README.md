@@ -11,7 +11,7 @@
     <img src="https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk" alt="Java 21" />
     <img src="https://img.shields.io/badge/Spring_Boot-4.0-brightgreen?style=for-the-badge&logo=springboot" alt="Spring Boot 4.0" />
     <img src="https://img.shields.io/badge/Next.js-15-blue?style=for-the-badge&logo=nextdotjs" alt="Next.js 15" />
-    <img src="https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwindcss" alt="Tailwind CSS" />
+    <img src="https://img.shields.io/badge/Android-Kotlin_/_Compose-3DDC84?style=for-the-badge&logo=android" alt="Android Kotlin Compose" />
     <img src="https://img.shields.io/badge/PostgreSQL-18-blue?style=for-the-badge&logo=postgresql" alt="PostgreSQL" />
     <img src="https://img.shields.io/badge/Docker-Supported-blue?style=for-the-badge&logo=docker" alt="Docker" />
   </p>
@@ -28,6 +28,13 @@
 - **💳 Stripe Subscription & Billing**: Complete subscription lifecycle management with Stripe Checkout, Webhooks, and Plan Comparisons.
 - **👥 Real-Time Collaboration**: Invite team members, configure RBAC roles (Owner/Editor/Viewer), and build together.
 - **🎨 Elite Dark Theme UI**: Sleek, high-fidelity dark-mode interface built with Tailwind CSS, Framer Motion, and Radix/Shadcn UI.
+
+### 📱 Native Android Mobile App
+- **🎨 Sleek Compose UI**: Modern, fluid Jetpack Compose user interface matching the high-fidelity dark-mode web dashboard.
+- **🤖 Mobile Prompting Workspace**: Direct integration with Spring AI/SSE backend for streaming chat and code generation on-the-go.
+- **⚡ In-App Web Preview Sandbox**: Run React, Next.js, and HTML templates directly on device utilizing a client-side Sandpack rendering engine inside custom interactive WebViews.
+- **📂 Workspace Code & Files View**: Browse and explore full project file hierarchies dynamically from your mobile phone.
+- **💳 Native Billing Checkout**: Complete subscription management and upgrade flows via customized Stripe checkout web interfaces.
 
 ### ⚙️ Robust Backend
 - **☕ Spring Boot 4 REST API**: High-throughput RestControllers built with Java 21 and Spring Web.
@@ -154,6 +161,16 @@ npm run dev
 
 Visit the app at **`http://localhost:5173`**.
 
+### 4. Android App Setup
+Open the [`Android App`](file:///c:/Lovable%20Git/Android%20App) folder in Android Studio.
+The application connects automatically to the live deployed Azure backend by default (`https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io`).
+If you want to configure it to point to a local instance of the backend:
+- Update `API_BASE_URL` inside [`Android App/app/build.gradle.kts`](file:///c:/Lovable%20Git/Android%20App/app/build.gradle.kts):
+```kotlin
+buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"") // 10.0.2.2 is the localhost gateway for the Android Emulator
+```
+Build and run on your emulator or physical Android device.
+
 ---
 
 ## ☁️ Production on Azure (Container Apps)
@@ -250,24 +267,24 @@ Dockerfiles: [`Dockerfile.backend`](Dockerfile.backend), [`frontend/Dockerfile`]
 - [x] **Stripe Integration**: Plan seeding, checkout redirects, and portal management.
 - [x] **Usage Guardrails**: Token quotas and active preview limits.
 - [x] **Team Collaboration**: Invite system with Owner, Editor, Viewer roles.
+- [x] **📱 Android Mobile Client**: Native Android application for AuraCode with live previews, full project editing, and checkout integration.
 - [ ] **One-Click Deployments**: Direct deployment of generated apps to Vercel/Netlify.
-- [ ] **📱 Android Mobile Client**: Native Android application for AuraCode with live previews, biometric login, and project sharing.
 
 ---
 
-## 📱 Next Phase: Android Mobile Client
+## 📱 Native Android Mobile Client
 
-To extend AuraCode to mobile environments, the next phase is building the **AuraCode Android Client**.
+To extend AuraCode to mobile environments, the **AuraCode Android Client** provides a fully native experience built from the ground up with Kotlin and Jetpack Compose.
 
 ### Key Features:
 * **Mobile Workspace**: Prompt and preview your web applications directly on your phone or tablet.
-* **Biometric Authentication**: Secure JWT session verification via fingerprint or face unlock.
-* **Offline Caching**: Local caching of projects, files, and chat history.
-* **Instant Collaboration**: Share live preview links with team members via native share sheets.
+* **In-App Sandpack WebView Preview**: Render dynamically generated React, Next.js, and HTML projects client-side in an interactive mobile preview component.
+* **Stripe Checkout Web Interface**: Seamlessly upgrade plans and purchase tokens directly from within the app.
+* **Hilt Dependency Injection**: Modular architecture using Hilt, Retrofit, KotlinX Serialization, OkHttp, and Coroutines.
 
 <div align="center">
   <img src="docs/assets/android-preview.png" alt="AuraCode Android App Preview" width="320" style="border-radius: 20px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
-  <p><i>Sleek mobile dashboard and code preview generator (Coming Soon!)</i></p>
+  <p><i>Sleek mobile dashboard and code preview generator (Fully Implemented)</i></p>
 </div>
 
 ---
