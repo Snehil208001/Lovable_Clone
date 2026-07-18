@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
+
 
 @Getter
 @Setter
@@ -21,6 +23,9 @@ public class Plan {
 
     @Column(unique = true)
     String stripePriceId;
+
+    /** INR amount charged via Cashfree (null = Cashfree checkout disabled for this plan). */
+    BigDecimal amountInr;
 
     Integer maxProjects;
 

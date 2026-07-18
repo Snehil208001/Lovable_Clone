@@ -5,6 +5,7 @@ import com.snehil.project.lovable_clone.security.JwtUserPrincipal;
 import com.snehil.project.lovable_clone.service.PaymentProcessor;
 import com.snehil.project.lovable_clone.service.PlanService;
 import com.snehil.project.lovable_clone.service.SubscriptionService;
+import com.snehil.project.lovable_clone.service.impl.CashfreePaymentService;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -31,6 +33,7 @@ public class BillingController {
     private final PlanService planService;
     private final SubscriptionService subscriptionService;
     private final PaymentProcessor paymentProcessor;
+    private final CashfreePaymentService cashfreePaymentService;
 
     @Value("${stripe.webhook.secret:}")
     private String webhookSecret;
@@ -51,6 +54,10 @@ public class BillingController {
             @RequestBody CheckoutRequest request,
             @AuthenticationPrincipal JwtUserPrincipal currentUser
     ) {
+        String provider = StringUtils.hasText(request.provider()) ? request.provider().trim().toUpperCase() : "STRIPE";
+        if ("CASHFREE".equals(provider)) {
+            return ResponseEntity.ok(cashfreePaymentService.createCheckoutSession(request, currentUser.userId()));
+        }
         return ResponseEntity.ok(paymentProcessor.createCheckoutSessionUrl(request, currentUser.userId()));
     }
 
@@ -107,6 +114,21 @@ public class BillingController {
         } catch (Exception e) {
             log.error("Error processing Stripe webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
+        }
+    }
+
+    @PostMapping("/webhooks/cashfree")
+    public ResponseEntity<String> handleCashfreeWebhook(
+            @RequestBody String payload,
+            @RequestHeader(value = "x-webhook-signature", required = false) String signature,
+            @RequestHeader(value = "x-webhook-timestamp", required = false) String timestamp
+    ) {
+        try {
+            cashfreePaymentService.handleWebhook(payload, signature, timestamp);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.warn("Cashfree webhook rejected: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
 }

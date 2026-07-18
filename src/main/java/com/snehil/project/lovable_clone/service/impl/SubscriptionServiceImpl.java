@@ -1,8 +1,5 @@
 package com.snehil.project.lovable_clone.service.impl;
 
-import com.snehil.project.lovable_clone.dto.subscriptions.CheckoutRequest;
-import com.snehil.project.lovable_clone.dto.subscriptions.CheckoutResponse;
-import com.snehil.project.lovable_clone.dto.subscriptions.PostalResponse;
 import com.snehil.project.lovable_clone.dto.subscriptions.SubscriptionResponse;
 import com.snehil.project.lovable_clone.entity.Plan;
 import com.snehil.project.lovable_clone.entity.Subscription;
@@ -53,7 +50,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     @Override
-    public void activateSubscription(Long userId, Long planId, String subscriptionId, String customerId) {
+    public void activateSubscription(Long userId, Long planId, String subscriptionId, String customerId,
+                                     String paymentProvider) {
         boolean exists = subscriptionRepository.existsByStripeSubscriptionId(subscriptionId);
         if (exists) return;
 
@@ -64,6 +62,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .user(user)
                 .plan(plan)
                 .stripeSubscriptionId(subscriptionId)
+                .paymentProvider(paymentProvider != null ? paymentProvider : "STRIPE")
                 .status(SubscriptionStatus.ACTIVE)
                 // FIX: Explicitly set to false upon initial creation
                 .cancelAtPeriodEnd(false)

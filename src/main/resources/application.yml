@@ -51,18 +51,26 @@ jwt:
 
 stripe:
   api:
-    secret: ${STRIPE_API_KEY}
+    secret: ${STRIPE_API_KEY:}
   webhook:
-    secret: ${STRIPE_WEBHOOK_SECRET}
+    secret: ${STRIPE_WEBHOOK_SECRET:}
 
+cashfree:
+  app-id: ${CASHFREE_APP_ID:}
+  secret-key: ${CASHFREE_SECRET_KEY:}
+  # SANDBOX or PRODUCTION
+  env: ${CASHFREE_ENV:PRODUCTION}
+  # Optional public webhook URL (also configure in Cashfree Dashboard → Webhooks)
+  notify-url: ${CASHFREE_NOTIFY_URL:}
 
-# First startup with an empty DB: seeds one plan (id 1) when set. Use a Price id from Stripe Dashboard → Products.
+# First startup with an empty DB: seeds one plan (id 1) when Stripe price and/or INR amount is set.
 billing:
   default-plan:
     name: Pro
     stripe-price-id: ${STRIPE_DEFAULT_PRICE_ID:}
+    amount-inr: ${CASHFREE_DEFAULT_AMOUNT_INR:0}
 
-# The Next.js frontend origin (dev server runs `next dev -p 5173`); Stripe
+# The Next.js frontend origin (dev server runs `next dev -p 5173`); Stripe/Cashfree
 # checkout redirects back to {client.url}/billing?status=... after payment.
 client.url: ${CLIENT_URL:http://localhost:5173}
 

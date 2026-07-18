@@ -45,6 +45,10 @@ public class StripePlanPriceValidator implements ApplicationRunner {
 
         for (Plan plan : planRepository.findAll()) {
             if (!Boolean.TRUE.equals(plan.getActive())) continue;
+            if (plan.getStripePriceId() == null || plan.getStripePriceId().isBlank()) {
+                // Cashfree-only plans are valid without a Stripe price id.
+                continue;
+            }
             if (isPriceUsable(plan)) continue;
 
             if (!stripeSecretKey.startsWith("sk_test_")) {

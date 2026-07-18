@@ -58,10 +58,15 @@ export interface PostalResponse {
 
 export interface CheckoutRequest {
   planId: number;
+  provider?: "STRIPE" | "CASHFREE";
+  customerPhone?: string;
 }
 
 export interface CheckoutResponse {
-  checkoutUrl: string;
+  checkoutUrl?: string | null;
+  paymentSessionId?: string | null;
+  provider?: string;
+  cashfreeEnv?: string | null;
 }
 
 export interface PlanResponse {
@@ -71,6 +76,7 @@ export interface PlanResponse {
   maxTokensPerDay: number;
   unlimitedAi: boolean;
   price: string;
+  amountInr?: number | null;
 }
 
 export interface SubscriptionResponse {

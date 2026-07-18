@@ -4,7 +4,9 @@
 # jwt.secret-key — long random string (HS256 needs enough bytes; 32+ characters is typical).
 # stripe.api.secret — from Stripe Dashboard → Developers → API keys (e.g. sk_test_...).
 # stripe.webhook.secret — from Stripe Dashboard → Developers → Webhooks → signing secret (whsec_...).
-# client.url — front-end base URL used for Stripe Checkout success/cancel redirects.
+# cashfree.app-id / secret-key — from Cashfree Merchant Dashboard → Developers → API Keys.
+# billing.default-plan.amount-inr — INR price used for Cashfree checkout (and plan seed/backfill).
+# client.url — front-end base URL used for checkout success/cancel redirects.
 
 jwt:
   secret-key: YOUR_JWT_SECRET_HERE
@@ -15,5 +17,15 @@ stripe:
   webhook:
     secret: YOUR_STRIPE_WEBHOOK_SIGNING_SECRET_HERE
 
+cashfree:
+  app-id: YOUR_CASHFREE_APP_ID
+  secret-key: YOUR_CASHFREE_SECRET_KEY
+  env: PRODUCTION
+  notify-url:
+
+billing:
+  default-plan:
+    amount-inr: 999
+
 client:
-  url: http://localhost:8080
+  url: http://localhost:5173

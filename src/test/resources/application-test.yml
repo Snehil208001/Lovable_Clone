@@ -26,9 +26,15 @@ stripe:
   webhook:
     secret: ""
 
+cashfree:
+  app-id: ""
+  secret-key: ""
+  env: SANDBOX
+
 billing:
   default-plan:
     stripe-price-id: ""
+    amount-inr: 0
 
 minio:
   url: http://127.0.0.1:1

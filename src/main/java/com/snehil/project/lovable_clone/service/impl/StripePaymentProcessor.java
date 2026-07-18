@@ -75,7 +75,7 @@ public class StripePaymentProcessor implements PaymentProcessor {
 
 
             Session session = Session.create(params.build());
-            return new CheckoutResponse(session.getUrl());
+            return CheckoutResponse.stripe(session.getUrl());
         } catch (StripeException e) {
             log.error("Stripe checkout failed for plan {} (price {})", plan.getId(), plan.getStripePriceId(), e);
             throw new BadRequestException("Payment provider rejected the checkout: " + stripeErrorMessage(e));
@@ -155,9 +155,7 @@ public class StripePaymentProcessor implements PaymentProcessor {
             userRepository.save(user);
         }
 
-        subscriptionService.activateSubscription(userId,planId,subscriptionId,customerId);
-
-
+        subscriptionService.activateSubscription(userId, planId, subscriptionId, customerId, "STRIPE");
     }
 
     private void handleCustomerSubscriptionUpdated(Subscription subscription) {

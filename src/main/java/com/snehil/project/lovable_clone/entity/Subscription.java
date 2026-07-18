@@ -33,6 +33,9 @@ public class Subscription {
 
     String stripeSubscriptionId;
 
+    /** STRIPE or CASHFREE — which gateway owns stripeSubscriptionId / gateway reference. */
+    String paymentProvider;
+
     Instant currentPeriodStart;
     Instant currentPeriodEnd;
 

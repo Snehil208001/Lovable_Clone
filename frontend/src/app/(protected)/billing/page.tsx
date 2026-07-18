@@ -32,7 +32,13 @@ import { useAuthStore } from "@/stores/auth-store";
 // The backend resolves each plan's Stripe price id to a plain decimal amount
 // (e.g. "20"). A raw "price_..." id only arrives when Stripe was unreachable —
 // render that as "Paid" rather than an id.
-function formatPlanPrice(price: string | undefined | null): { isFree: boolean; label: string } {
+function formatPlanPrice(
+  price: string | undefined | null,
+  amountInr?: number | null,
+): { isFree: boolean; label: string } {
+  if (amountInr != null && amountInr > 0) {
+    return { isFree: false, label: `₹${amountInr}` };
+  }
   if (!price) return { isFree: true, label: "Free" };
   if (price.startsWith("price_")) {
     return { isFree: false, label: "Paid" };
@@ -50,7 +56,7 @@ export default function BillingPage() {
   const [usage, setUsage] = useState<UsageTodayResponse | null>(null);
   const [limits, setLimits] = useState<PlanLimitsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [checkoutLoadingId, setCheckoutLoadingId] = useState<number | null>(null);
+  const [checkoutLoadingKey, setCheckoutLoadingKey] = useState<string | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const searchParams = useSearchParams();
   const [checkoutStatus, setCheckoutStatus] = useState<string | null>(null);
@@ -94,13 +100,29 @@ export default function BillingPage() {
     return () => { mounted = false; };
   }, []);
 
-  async function onCheckout(planId: number) {
-    setCheckoutLoadingId(planId);
+  async function onCheckout(planId: number, provider: "STRIPE" | "CASHFREE") {
+    const loadingKey = `${provider}-${planId}`;
+    setCheckoutLoadingKey(loadingKey);
     try {
-      const response = await ApiClient.createCheckoutSession({ planId });
-      window.location.href = response.data.checkoutUrl;
+      const response = await ApiClient.createCheckoutSession({ planId, provider });
+      const data = response.data;
+      if (provider === "CASHFREE" && data.paymentSessionId) {
+        const { load } = await import("@cashfreepayments/cashfree-js");
+        const mode = data.cashfreeEnv === "sandbox" ? "sandbox" : "production";
+        const cashfree = await load({ mode });
+        await cashfree.checkout({
+          paymentSessionId: data.paymentSessionId,
+          redirectTarget: "_self",
+        });
+        return;
+      }
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      setCheckoutLoadingKey(null);
     } catch {
-      setCheckoutLoadingId(null);
+      setCheckoutLoadingKey(null);
     }
   }
 
@@ -282,11 +304,14 @@ export default function BillingPage() {
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {plans.map((plan, index) => {
                 const isCurrent = subscription?.plan?.id === plan.id;
-                const { isFree, label: priceLabel } = formatPlanPrice(plan.price);
+                const { isFree, label: priceLabel } = formatPlanPrice(plan.price, plan.amountInr);
+                const hasCashfree = plan.amountInr != null && Number(plan.amountInr) > 0;
                 const nameLower = plan.name.toLowerCase();
                 const isPro = nameLower.includes("pro");
                 const isBusiness = nameLower.includes("business");
                 const isFeatured = isPro || isBusiness;
+                const stripeLoading = checkoutLoadingKey === `STRIPE-${plan.id}`;
+                const cashfreeLoading = checkoutLoadingKey === `CASHFREE-${plan.id}`;
                 
                 return (
                   <motion.div key={plan.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
@@ -346,18 +371,33 @@ export default function BillingPage() {
                           </li>
                         </ul>
                         
-                        <div className="pt-3">
+                        <div className="pt-3 space-y-2">
                           {isCurrent ? (
                             <Button disabled className="w-full bg-zinc-800 text-zinc-500 border border-white/5 rounded-xl cursor-default text-xs h-10">Active Plan</Button>
                           ) : (
-                            <Button onClick={() => onCheckout(plan.id)} disabled={checkoutLoadingId === plan.id}
-                              className={`w-full text-xs font-bold h-10 rounded-xl transition-all duration-200 active:scale-[0.98] ${
-                                isFeatured 
-                                  ? "bg-primary text-primary-foreground hover:bg-emerald-400 shadow-[0_4px_15px_rgba(34,197,94,0.25)]" 
-                                  : "bg-zinc-800 text-zinc-100 hover:bg-zinc-700 hover:text-white"
-                              }`}>
-                              {checkoutLoadingId === plan.id ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Connecting...</> : <><Zap className="mr-1.5 size-3.5" />{isFree ? "Downgrade" : "Upgrade Plan"}</>}
-                            </Button>
+                            <>
+                              {!isFree && hasCashfree && (
+                                <Button onClick={() => onCheckout(plan.id, "CASHFREE")} disabled={Boolean(checkoutLoadingKey)}
+                                  className={`w-full text-xs font-bold h-10 rounded-xl transition-all duration-200 active:scale-[0.98] ${
+                                    isFeatured
+                                      ? "bg-primary text-primary-foreground hover:bg-emerald-400 shadow-[0_4px_15px_rgba(34,197,94,0.25)]"
+                                      : "bg-zinc-800 text-zinc-100 hover:bg-zinc-700 hover:text-white"
+                                  }`}>
+                                  {cashfreeLoading ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Opening Cashfree...</> : <><Zap className="mr-1.5 size-3.5" />Pay with Cashfree (UPI)</>}
+                                </Button>
+                              )}
+                              <Button onClick={() => onCheckout(plan.id, "STRIPE")} disabled={Boolean(checkoutLoadingKey)}
+                                variant={hasCashfree && !isFree ? "outline" : "default"}
+                                className={`w-full text-xs font-bold h-10 rounded-xl transition-all duration-200 active:scale-[0.98] ${
+                                  hasCashfree && !isFree
+                                    ? "border-white/10 bg-transparent text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                    : isFeatured
+                                      ? "bg-primary text-primary-foreground hover:bg-emerald-400 shadow-[0_4px_15px_rgba(34,197,94,0.25)]"
+                                      : "bg-zinc-800 text-zinc-100 hover:bg-zinc-700 hover:text-white"
+                                }`}>
+                                {stripeLoading ? <><Loader2 className="mr-2 size-3.5 animate-spin" />Connecting...</> : <><CreditCard className="mr-1.5 size-3.5" />{isFree ? "Downgrade" : "Pay with Stripe"}</>}
+                              </Button>
+                            </>
                           )}
                         </div>
                       </CardContent>
