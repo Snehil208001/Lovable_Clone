@@ -3,8 +3,8 @@ spring:
     name: lovable-clone
 
   datasource:
-    url: jdbc:postgresql://localhost:9010/pgvector-test
-    username: user
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:9010/pgvector-test}
+    username: ${DB_USER:user}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
@@ -39,9 +39,15 @@ spring:
           # Multi-screen apps stream 15-30k output tokens; without this the provider
           # default can truncate the response mid-file.
           max-tokens: ${OPENAI_MAX_TOKENS:20000}
+          # OpenAI omits usage stats from streamed responses unless asked; without this
+          # recordTokenUsage() always receives nothing and daily limits are never enforced.
+          stream-usage: true
 
 jwt:
   secret-key: ${JWT_SECRET_KEY}
+  # There is no refresh-token flow; a short expiry logs users out mid-session
+  # (10 min caused constant "JWT expired" failures). 12h is a dev-friendly default.
+  access-token-validity-minutes: ${JWT_VALIDITY_MINUTES:720}
 
 stripe:
   api:
@@ -70,9 +76,12 @@ logging:
 # Console UI is a different port (often 9001)—do not use that as minio.url.
 # When MinIO is unreachable, files still save in Postgres (project_files.content).
 minio:
-  url: http://127.0.0.1:9002
-  region: us-east-1
-  access-key: minioadmin
-  secret-key: minioadmin123
-  project-bucket: projects
+  url: ${MINIO_URL:http://127.0.0.1:9002}
+  region: ${MINIO_REGION:us-east-1}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+  project-bucket: ${MINIO_PROJECT_BUCKET:projects}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
 

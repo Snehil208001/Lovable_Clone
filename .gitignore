@@ -35,6 +35,11 @@ build/
 ### Local secrets (override in this file; never commit real keys) ###
 application-local.yml
 **/application-local.yml
+deploy/gcp/config.env
+deploy/gcp/config.env.generated
+deploy/azure/config.env
+.env
+.env.*
 
 testsprite_tests\tmp\config.json
 

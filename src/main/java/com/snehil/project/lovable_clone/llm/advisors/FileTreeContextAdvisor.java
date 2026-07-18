@@ -56,10 +56,12 @@ public class FileTreeContextAdvisor implements StreamAdvisor {
             allMessages.add(systemMessage);
         }
 
-        // FIXED:
         List<FileNode> fileTree = projectFileService.getFileTree(projectId);
-        String fileTreeContext = "\n\n ---- FILE_TREE ----\n"+fileTree.toString();
-        allMessages.add(new SystemMessage(fileTreeContext));
+        StringBuilder ctx = new StringBuilder("\n\n ---- FILE_TREE ----\n");
+        ctx.append(fileTree.toString());
+        ctx.append("\n\n ---- PROJECT_SUMMARY ----\n");
+        ctx.append(buildProjectSummary(fileTree));
+        allMessages.add(new SystemMessage(ctx.toString()));
 
         allMessages.addAll(userMessages);
 
@@ -68,7 +70,6 @@ public class FileTreeContextAdvisor implements StreamAdvisor {
                 .prompt(new Prompt(allMessages, request.prompt().getOptions()))
                 .build();
     }
-
 
     @Override
     public String getName() {
@@ -79,14 +80,25 @@ public class FileTreeContextAdvisor implements StreamAdvisor {
     public int getOrder() {
         return 0;
     }
+
+    private static String buildProjectSummary(List<FileNode> fileTree) {
+        List<String> pages = new ArrayList<>();
+        List<String> components = new ArrayList<>();
+        List<String> entry = new ArrayList<>();
+        for (FileNode node : fileTree) {
+            String path = node.path();
+            if (path == null) continue;
+            if (path.startsWith("src/pages/") || path.contains("/pages/")) {
+                pages.add(path);
+            } else if (path.startsWith("src/components/") || path.contains("/components/")) {
+                components.add(path);
+            } else if (path.equals("src/App.tsx") || path.equals("src/main.tsx") || path.equals("src/index.css")) {
+                entry.add(path);
+            }
+        }
+        return "entry=" + entry + "; pages=" + pages + "; components=" + components;
+    }
 }
-
-
-
-
-
-
-// System Prompt + File Tree + User message
 
 
 

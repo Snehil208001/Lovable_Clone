@@ -1,0 +1,169 @@
+# Cloud Build: build + push + deploy backend and frontend Cloud Run services.
+# Trigger on main, or:
+#   gcloud builds submit --config=cloudbuild.yaml \
+#     --substitutions=_REGION=us-central1,_AR_REPO=auracode,_BACKEND_SERVICE=auracode-api,_FRONTEND_SERVICE=auracode-web,_CLOUD_SQL_INSTANCE=PROJECT:REGION:INSTANCE,_DB_NAME=auracode,_DB_USER=auracode,_GCS_BUCKET=BUCKET,_CLIENT_URL=https://...,_STRIPE_DEFAULT_PRICE_ID=
+#
+# Secrets must already exist in Secret Manager (see deploy/gcp/04-secrets.sh).
+
+substitutions:
+  _REGION: us-central1
+  _AR_REPO: auracode
+  _BACKEND_SERVICE: auracode-api
+  _FRONTEND_SERVICE: auracode-web
+  _CLOUD_SQL_INSTANCE: "" # project:region:instance
+  _DB_NAME: auracode
+  _DB_USER: auracode
+  _GCS_BUCKET: ""
+  _CLIENT_URL: "" # frontend URL (set after first frontend deploy, or use custom domain)
+  _STRIPE_DEFAULT_PRICE_ID: ""
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # --- Backend image ---
+  - id: build-backend
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.backend
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/backend:${SHORT_SHA}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/backend:latest
+      - .
+
+  - id: push-backend
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker push "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/backend:${SHORT_SHA}"
+        docker push "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/backend:latest"
+    waitFor: [build-backend]
+
+  # --- Frontend image (API URL = current backend service URL) ---
+  - id: resolve-backend-url
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        URL=$(gcloud run services describe "${_BACKEND_SERVICE}" --region="${_REGION}" --format='value(status.url)' 2>/dev/null || true)
+        if [[ -z "$${URL}" ]]; then
+          # First deploy: placeholder; frontend step may need a second build after backend is up
+          URL="https://${_BACKEND_SERVICE}-placeholder.run.app"
+        fi
+        echo -n "$${URL}" > /workspace/backend_url.txt
+        echo "Backend URL for frontend build: $${URL}"
+    waitFor: ["-"]
+
+  - id: build-frontend
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        API_URL=$(cat /workspace/backend_url.txt)
+        docker build \
+          -f frontend/Dockerfile \
+          --build-arg "NEXT_PUBLIC_API_BASE_URL=$${API_URL}" \
+          -t "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:${SHORT_SHA}" \
+          -t "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:latest" \
+          frontend
+    waitFor: [resolve-backend-url]
+
+  - id: push-frontend
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker push "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:${SHORT_SHA}"
+        docker push "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:latest"
+    waitFor: [build-frontend]
+
+  - id: deploy-backend
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        JDBC_URL="jdbc:postgresql:///${_DB_NAME}?cloudSqlInstance=${_CLOUD_SQL_INSTANCE}&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
+        CLIENT="${_CLIENT_URL}"
+        if [[ -z "$${CLIENT}" ]]; then
+          CLIENT=$(gcloud run services describe "${_FRONTEND_SERVICE}" --region="${_REGION}" --format='value(status.url)' 2>/dev/null || echo "")
+        fi
+        gcloud run deploy "${_BACKEND_SERVICE}" \
+          --image="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/backend:${SHORT_SHA}" \
+          --region="${_REGION}" \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --cpu=1 \
+          --memory=1Gi \
+          --min-instances=0 \
+          --max-instances=10 \
+          --timeout=3600 \
+          --no-cpu-throttling \
+          --add-cloudsql-instances="${_CLOUD_SQL_INSTANCE}" \
+          --set-env-vars="SPRING_PROFILES_ACTIVE=prod,SPRING_DATASOURCE_URL=$${JDBC_URL},DB_USER=${_DB_USER},CLIENT_URL=$${CLIENT},CORS_ALLOWED_ORIGINS=$${CLIENT},MINIO_URL=https://storage.googleapis.com,MINIO_REGION=us-east1,MINIO_PROJECT_BUCKET=${_GCS_BUCKET},STRIPE_DEFAULT_PRICE_ID=${_STRIPE_DEFAULT_PRICE_ID}" \
+          --set-secrets="DB_PASSWORD=DB_PASSWORD:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,STRIPE_API_KEY=STRIPE_API_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,MINIO_ACCESS_KEY=MINIO_ACCESS_KEY:latest,MINIO_SECRET_KEY=MINIO_SECRET_KEY:latest"
+        gcloud run services describe "${_BACKEND_SERVICE}" --region="${_REGION}" --format='value(status.url)' > /workspace/backend_url.txt
+    waitFor: [push-backend]
+
+  - id: rebuild-frontend-if-needed
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        API_URL=$(cat /workspace/backend_url.txt)
+        docker build \
+          -f frontend/Dockerfile \
+          --build-arg "NEXT_PUBLIC_API_BASE_URL=$${API_URL}" \
+          -t "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:${SHORT_SHA}" \
+          -t "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:latest" \
+          frontend
+        docker push "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:${SHORT_SHA}"
+        docker push "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:latest"
+    waitFor: [deploy-backend, push-frontend]
+
+  - id: deploy-frontend
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        gcloud run deploy "${_FRONTEND_SERVICE}" \
+          --image="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:${SHORT_SHA}" \
+          --region="${_REGION}" \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --cpu=1 \
+          --memory=512Mi \
+          --min-instances=0 \
+          --max-instances=10 \
+          --timeout=300
+        FE_URL=$(gcloud run services describe "${_FRONTEND_SERVICE}" --region="${_REGION}" --format='value(status.url)')
+        echo "Frontend: $${FE_URL}"
+        # Keep backend CLIENT_URL / CORS in sync
+        JDBC_URL="jdbc:postgresql:///${_DB_NAME}?cloudSqlInstance=${_CLOUD_SQL_INSTANCE}&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
+        gcloud run services update "${_BACKEND_SERVICE}" \
+          --region="${_REGION}" \
+          --update-env-vars="CLIENT_URL=$${FE_URL},CORS_ALLOWED_ORIGINS=$${FE_URL}"
+    waitFor: [rebuild-frontend-if-needed]
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/backend:${SHORT_SHA}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/frontend:${SHORT_SHA}
+
+timeout: 3600s

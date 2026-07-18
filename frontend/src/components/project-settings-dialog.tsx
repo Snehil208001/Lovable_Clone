@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash, UserPlus, X, Loader2, Save } from "lucide-react";
+import { Trash, UserPlus, X, Loader2, Save, Users, Settings as SettingsIcon } from "lucide-react";
 
 import { ApiClient, type MemberResponse } from "@/lib/api-client";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export function ProjectSettingsDialog({
   projectId,
@@ -132,62 +133,64 @@ export function ProjectSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/10 bg-zinc-950 text-zinc-50 sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Project Settings</DialogTitle>
-          <DialogDescription className="text-zinc-400">
-            Manage your project details and team access.
+      <DialogContent className="border-white/10 bg-zinc-950/95 backdrop-blur-2xl text-zinc-50 sm:max-w-[500px] rounded-2xl shadow-2xl">
+        <DialogHeader className="space-y-1.5">
+          <DialogTitle className="text-lg font-bold tracking-tight">Project Settings</DialogTitle>
+          <DialogDescription className="text-xs text-zinc-400">
+            Manage your workspace settings and team invitations.
           </DialogDescription>
         </DialogHeader>
 
         {errorMsg && (
-          <div className="rounded-md bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
+          <div className="rounded-xl bg-red-500/10 p-3.5 text-xs text-red-400 border border-red-500/20">
             {errorMsg}
           </div>
         )}
 
-        <Tabs defaultValue="general" className="mt-4">
-          <TabsList className="w-full bg-zinc-900 border border-white/5">
-            <TabsTrigger value="general" className="flex-1 data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100">
+        <Tabs defaultValue="general" className="mt-2">
+          <TabsList className="w-full bg-zinc-900/60 border border-white/5 rounded-xl p-1 gap-1">
+            <TabsTrigger value="general" className="flex-1 rounded-lg text-xs font-semibold data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-50 flex items-center justify-center gap-1.5 h-8">
+              <SettingsIcon className="size-3.5" />
               General
             </TabsTrigger>
-            <TabsTrigger value="members" className="flex-1 data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100">
+            <TabsTrigger value="members" className="flex-1 rounded-lg text-xs font-semibold data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-50 flex items-center justify-center gap-1.5 h-8">
+              <Users className="size-3.5" />
               Members
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Project Name</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="name" className="text-xs text-zinc-300 font-medium">Project Name</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="border-white/10 bg-zinc-900/80"
+                className="h-10 border-white/10 bg-zinc-900/60 focus:border-indigo-500/50 focus:ring-indigo-500/10 focus:ring-2 rounded-xl text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="desc">Description</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="desc" className="text-xs text-zinc-300 font-medium">Description</Label>
               <Textarea
                 id="desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="border-white/10 bg-zinc-900/80 min-h-[100px]"
+                className="border-white/10 bg-zinc-900/60 focus:border-indigo-500/50 focus:ring-indigo-500/10 focus:ring-2 rounded-xl text-sm min-h-[100px] resize-none"
               />
             </div>
 
-            <div className="flex justify-between pt-4">
+            <div className="flex justify-between items-center pt-4 border-t border-white/5">
               <Button
                 variant="destructive"
                 onClick={onDeleteProject}
                 disabled={isDeleting}
-                className="bg-red-500/20 text-red-400 hover:bg-red-500/30 hover:text-red-300 border border-red-500/20"
+                className="bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 rounded-xl h-9.5 text-xs font-semibold"
               >
-                {isDeleting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash className="mr-2 size-4" />}
+                {isDeleting ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : <Trash className="mr-1.5 size-3.5" />}
                 Delete Project
               </Button>
-              <Button onClick={onSaveGeneral} disabled={isSaving} className="bg-indigo-500 hover:bg-indigo-400">
-                {isSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
+              <Button onClick={onSaveGeneral} disabled={isSaving} className="bg-gradient-to-r from-indigo-50 to-indigo-100 hover:from-white hover:to-white text-zinc-950 font-bold rounded-xl h-9.5 px-4 shadow-lg active:scale-95 transition-all text-xs">
+                {isSaving ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : <Save className="mr-1.5 size-3.5" />}
                 Save Changes
               </Button>
             </div>
@@ -195,8 +198,8 @@ export function ProjectSettingsDialog({
 
           <TabsContent value="members" className="mt-4 space-y-5">
             <form onSubmit={onInviteMember} className="flex items-end gap-2">
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs text-zinc-400">Invite via Email address</Label>
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-xs text-zinc-300 font-medium">Invite via Email address</Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="teammate@example.com"
@@ -204,69 +207,82 @@ export function ProjectSettingsDialog({
                     required
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
-                    className="border-white/10 bg-zinc-900/80 h-9"
+                    className="border-white/10 bg-zinc-900/60 focus:border-indigo-500/50 focus:ring-indigo-500/10 focus:ring-2 rounded-xl text-sm h-9.5 flex-1"
                   />
                   <Select
                     value={inviteRole}
                     onValueChange={(val: any) => setInviteRole(val)}
                   >
-                    <SelectTrigger className="w-[110px] h-9 border-white/10 bg-zinc-900/80">
+                    <SelectTrigger className="w-[110px] h-9.5 border-white/10 bg-zinc-900/60 focus:border-indigo-500/50 focus:ring-indigo-500/10 focus:ring-2 rounded-xl text-xs">
                       <SelectValue placeholder="Role" />
                     </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-zinc-900 text-zinc-100">
+                    <SelectContent className="border-white/10 bg-zinc-950 text-zinc-100 rounded-xl">
                       <SelectItem value="EDITOR">Editor</SelectItem>
                       <SelectItem value="VIEWER">Viewer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <Button type="submit" size="sm" disabled={isInviting} className="h-9 bg-indigo-500 hover:bg-indigo-400 shrink-0">
-                {isInviting ? <Loader2 className="size-4 animate-spin" /> : "Invite"}
+              <Button type="submit" disabled={isInviting} className="h-9.5 bg-indigo-500 hover:bg-indigo-400 text-white font-bold rounded-xl px-4 text-xs shrink-0 transition-all duration-200">
+                {isInviting ? <Loader2 className="size-3.5 animate-spin" /> : <UserPlus className="size-3.5 mr-1" />}
+                Invite
               </Button>
             </form>
 
             <div className="space-y-3">
-              <p className="text-sm font-medium text-zinc-300">Team Members</p>
+              <p className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Team Members</p>
               {isLoadingMembers ? (
-                <div className="flex justify-center py-4"><Loader2 className="size-5 animate-spin text-zinc-500" /></div>
+                <div className="flex justify-center py-6"><Loader2 className="size-5 animate-spin text-indigo-400" /></div>
               ) : (
-                <div className="space-y-2">
-                  {members.map((member) => (
-                    <div key={member.userId} className="flex items-center justify-between p-2 rounded-md border border-white/5 bg-zinc-900/30">
-                      <div>
-                        <p className="text-sm font-medium">{member.name}</p>
-                        <p className="text-xs text-zinc-500">{member.username}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={member.projectRole}
-                          onValueChange={(val: any) => onUpdateRole(member.userId, val)}
-                          disabled={member.projectRole === "OWNER" || member.userId === currentUser?.id}
-                        >
-                          <SelectTrigger className="w-[100px] h-8 text-xs border-white/10 bg-zinc-900/80">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="border-white/10 bg-zinc-900 text-zinc-100">
-                            <SelectItem value="OWNER" disabled>Owner</SelectItem>
-                            <SelectItem value="EDITOR">Editor</SelectItem>
-                            <SelectItem value="VIEWER">Viewer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        
-                        {member.projectRole !== "OWNER" && member.userId !== currentUser?.id && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => onRemoveMember(member.userId)}
-                            className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8"
+                <div className="space-y-2.5">
+                  {members.map((member) => {
+                    const initials = member.name
+                      ? member.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+                      : member.username.slice(0, 2).toUpperCase();
+                    return (
+                      <div key={member.userId} className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-zinc-900/20 hover:bg-zinc-900/40 transition-colors duration-200">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="size-8 border border-white/10">
+                            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-sky-500 text-[10px] font-bold text-white">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-xs font-semibold text-zinc-150">{member.name}</p>
+                            <p className="text-[10px] text-zinc-500">{member.username}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={member.projectRole}
+                            onValueChange={(val: any) => onUpdateRole(member.userId, val)}
+                            disabled={member.projectRole === "OWNER" || member.userId === currentUser?.id}
                           >
-                            <X className="size-4" />
-                          </Button>
-                        )}
+                            <SelectTrigger className="w-[100px] h-8 text-[11px] border-white/10 bg-zinc-900/60 focus:border-indigo-500/50 focus:ring-indigo-500/10 rounded-lg">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="border-white/10 bg-zinc-950 text-zinc-100 rounded-lg">
+                              <SelectItem value="OWNER" disabled>Owner</SelectItem>
+                              <SelectItem value="EDITOR">Editor</SelectItem>
+                              <SelectItem value="VIEWER">Viewer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          
+                          {member.projectRole !== "OWNER" && member.userId !== currentUser?.id && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => onRemoveMember(member.userId)}
+                              className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8 rounded-lg"
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {members.length === 0 && <p className="text-sm text-zinc-500">No members found.</p>}
+                    );
+                  })}
+                  {members.length === 0 && <p className="text-xs text-zinc-500 text-center py-4">No team members found.</p>}
                 </div>
               )}
             </div>

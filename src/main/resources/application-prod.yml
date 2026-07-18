@@ -1,0 +1,91 @@
+# Production profile (Azure Container Apps / any container host).
+# Activate with SPRING_PROFILES_ACTIVE=prod. All secrets come from env / Key Vault.
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+
+spring:
+  datasource:
+    # Azure Database for PostgreSQL Flexible Server example:
+    # jdbc:postgresql://SERVER.postgres.database.azure.com:5432/auracode?sslmode=require
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 1
+      connection-timeout: 20000
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+  ai:
+    openai:
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-4.1-mini}
+          temperature: ${OPENAI_TEMPERATURE:0.7}
+          max-tokens: ${OPENAI_MAX_TOKENS:20000}
+          stream-usage: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  access-token-validity-minutes: ${JWT_VALIDITY_MINUTES:720}
+
+stripe:
+  api:
+    secret: ${STRIPE_API_KEY}
+  webhook:
+    secret: ${STRIPE_WEBHOOK_SECRET:}
+
+billing:
+  default-plan:
+    name: Pro
+    stripe-price-id: ${STRIPE_DEFAULT_PRICE_ID:}
+
+client:
+  url: ${CLIENT_URL}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:${CLIENT_URL}}
+
+# S3-compatible object storage (MinIO Container App on Azure, or any S3 endpoint).
+minio:
+  url: ${MINIO_URL}
+  region: ${MINIO_REGION:us-east-1}
+  access-key: ${MINIO_ACCESS_KEY}
+  secret-key: ${MINIO_SECRET_KEY}
+  project-bucket: ${MINIO_PROJECT_BUCKET:auracode-projects}
+
+logging:
+  level:
+    root: INFO
+    com.snehil.project.lovable_clone: INFO
+    org.springframework.ai: WARN
+    org.hibernate.SQL: WARN

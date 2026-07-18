@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import { delay, extractFilePathsFromResponse } from "@/lib/workspace/chat-format";
 import { streamAssistantResponse } from "@/lib/workspace/stream";
@@ -17,11 +17,17 @@ const FILE_SYNC_DELAY_MS = 800;
 
 /**
  * Sends a prompt to the AI stream, applies chunks to the optimistic assistant
- * message, then polls the file tree until the generated files land and
- * refreshes the preview.
+ * message, refreshes on mid-stream file_ready events, then syncs tree/preview.
  */
 export function useWorkspaceChat(projectId: number, { loadFileTree, refreshPreview }: UseWorkspaceChatDeps) {
   const token = useAuthStore((state) => state.token);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const stopGeneration = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    useWorkspaceStore.getState().setIsSending(false);
+  }, []);
 
   const sendPrompt = useCallback(
     async (trimmedPrompt: string) => {
@@ -41,41 +47,70 @@ export function useWorkspaceChat(projectId: number, { loadFileTree, refreshPrevi
 
       const userMessageId = `user-${Date.now()}`;
       const assistantMessageId = `assistant-${Date.now()}`;
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       appendMessages([
         { id: userMessageId, role: "USER", content: trimmedPrompt },
         { id: assistantMessageId, role: "ASSISTANT", content: "" },
       ]);
 
+      const readyPaths = new Set<string>();
+
       try {
         const assistantResponse = await streamAssistantResponse({
           projectId,
           prompt: trimmedPrompt,
           token,
+          signal: controller.signal,
           onChunk: (chunk) => appendToMessage(assistantMessageId, chunk),
+          onFileReady: (path) => {
+            readyPaths.add(path);
+            void (async () => {
+              const latestPaths = await loadFileTree(false);
+              await refreshPreview(latestPaths);
+            })();
+          },
+          onStreamError: (message) => setChatError(message),
         });
-        const expectedFilePaths = extractFilePathsFromResponse(assistantResponse);
 
+        if (!assistantResponse.trim() && readyPaths.size === 0) {
+          throw new Error("The AI returned an empty response");
+        }
+
+        const expectedFilePaths = extractFilePathsFromResponse(assistantResponse);
         let latestPaths = await loadFileTree(false);
 
         for (let attempt = 0; attempt < MAX_FILE_SYNC_ATTEMPTS; attempt += 1) {
-          const hasExpectedFiles = expectedFilePaths.every((path) => latestPaths.includes(path));
-          if (hasExpectedFiles) break;
+          const hasExpectedFiles =
+            expectedFilePaths.length === 0 ||
+            expectedFilePaths.every((path) => latestPaths.includes(path));
+          if (hasExpectedFiles || (readyPaths.size > 0 && attempt >= 2)) break;
           await delay(FILE_SYNC_DELAY_MS);
           latestPaths = await loadFileTree(false);
         }
 
         await refreshPreview(latestPaths);
       } catch (error) {
-        const detail = error instanceof Error && error.message !== "Streaming request failed" ? ` (${error.message})` : "";
+        if (error instanceof DOMException && error.name === "AbortError") {
+          fillEmptyMessage(assistantMessageId, "Generation stopped.");
+          const latestPaths = await loadFileTree(false);
+          await refreshPreview(latestPaths);
+          return;
+        }
+        const detail =
+          error instanceof Error && error.message !== "Streaming request failed"
+            ? ` (${error.message})`
+            : "";
         setChatError(`Streaming failed. Please try again.${detail}`);
         fillEmptyMessage(assistantMessageId, "I hit an error while generating a response.");
       } finally {
+        if (abortRef.current === controller) abortRef.current = null;
         setIsSending(false);
       }
     },
     [loadFileTree, projectId, refreshPreview, token],
   );
 
-  return { sendPrompt };
+  return { sendPrompt, stopGeneration };
 }

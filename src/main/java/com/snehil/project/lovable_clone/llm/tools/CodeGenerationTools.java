@@ -30,13 +30,21 @@ public class CodeGenerationTools {
 
             log.info("Requested file: {}", cleanPath);
 
-            String content = projectFileService.getFileContent(projectId, cleanPath, userId).content();
-
-            result.add(String.format(
-                    "--- START OF FILE: %s ---\n%s\n--- END OF FILE ---",
-                    cleanPath, content
-            ));
-
+            // A hallucinated path must degrade to an error entry the model can react to;
+            // a thrown exception here aborts the tool call and kills the whole stream.
+            try {
+                String content = projectFileService.getFileContent(projectId, cleanPath, userId).content();
+                result.add(String.format(
+                        "--- START OF FILE: %s ---\n%s\n--- END OF FILE ---",
+                        cleanPath, content
+                ));
+            } catch (Exception e) {
+                log.warn("read_files failed for {}: {}", cleanPath, e.getMessage());
+                result.add(String.format(
+                        "--- ERROR: file '%s' does not exist. Only request paths listed in FILE_TREE. ---",
+                        cleanPath
+                ));
+            }
         }
 
         return result;

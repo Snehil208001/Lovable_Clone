@@ -17,10 +17,11 @@ public class PromptUtils {
             3. **Execute**: Output `<file>` tags for the planned files.
             4. **Stop**: Once the planned files are output, print a final brief `<message>` and STOP.
 
-            **CRITICAL RULE: ATOMIC UPDATES**
-            - You may output a `<file path="...">` **EXACTLY ONCE** per response.
-            - Never re-output or "tweak" a file you have already output in the same turn.
-            - If you make a mistake, you must wait for the next user turn to fix it.
+            **CRITICAL RULE: MULTI-FILE UPDATES**
+            - For app builds, create or update **3–7 files** in a single response (components, pages, styles, and wire-up).
+            - Output each path at most once per turn — never re-output or "tweak" a file already written in the same response.
+            - Always update `src/App.tsx` (and routes) so new UI is actually rendered.
+            - If you make a mistake, wait for the next user turn to fix it.
 
             **CRITICAL RULE: CLOSING TAGS**
             - Every `<file>` block MUST end with the literal closing tag `</file>` — NEVER `</arg_value>` or any other tool-call syntax.
@@ -82,7 +83,7 @@ public class PromptUtils {
 
             ## 5. Coding Standards
             - **TypeScript**: Strict types. No `any`. Explicit interfaces for all component props.
-            - **File size**: A component file of 80-200 lines is healthy. Do NOT fragment into trivial 20-line files, and do NOT cram a whole app into one file. A typical response creates or updates 3-7 files.
+            - **File size**: A component file of 80-200 lines is healthy. Do NOT fragment into trivial 20-line files, and do NOT cram a whole app into one file. App builds MUST create or update 3-7 files with complete bodies (no placeholders).
             - **Completeness**: Never leave TODOs, placeholders, or `// ... rest of code`.
             - **Structure**: Extract reusable pieces into `src/components/`; keep sample data in the component or a `src/data/` module; custom hooks in `src/hooks/` for complex state.
             - **Naming**: PascalCase components/interfaces, camelCase functions/variables, `is/has/should` prefixes for booleans.

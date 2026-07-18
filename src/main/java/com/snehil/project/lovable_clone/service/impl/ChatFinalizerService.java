@@ -19,13 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
-/**
- * Persists everything produced by one completed AI generation (usage, messages,
- * events, files) in a single transaction. Separate bean from
- * {@link AiGenerationServiceImpl} so @Transactional proxying applies when called
- * from the streaming completion callback.
- */
 @Service
 @RequiredArgsConstructor
 public class ChatFinalizerService {
@@ -40,8 +35,13 @@ public class ChatFinalizerService {
     @Transactional
     public void finalizeChat(Long projectId, Long userId, String userMessage,
                              String fullText, long durationSeconds, Usage usage) {
-        // Re-load a managed session: the callback runs on a different thread,
-        // long after the request-time entity instance has detached.
+        finalizeChat(projectId, userId, userMessage, fullText, durationSeconds, usage, Set.of());
+    }
+
+    @Transactional
+    public void finalizeChat(Long projectId, Long userId, String userMessage,
+                             String fullText, long durationSeconds, Usage usage,
+                             Set<String> alreadyAppliedPaths) {
         ChatSession chatSession = chatSessionRepository.findById(new ChatSessionId(projectId, userId))
                 .orElseThrow(() -> new ResourceNotFoundException("ChatSession", projectId + ":" + userId));
 
@@ -78,9 +78,14 @@ public class ChatFinalizerService {
                 .sequenceOrder(0)
                 .build());
 
+        Set<String> applied = alreadyAppliedPaths != null ? alreadyAppliedPaths : Set.of();
         chatEventList.stream()
                 .filter(e -> e.getType() == ChatEventType.FILE_EDIT && e.getFilePath() != null)
-                .forEach(e -> projectFileService.saveFile(projectId, e.getFilePath(), e.getContent()));
+                .forEach(e -> {
+                    if (!applied.contains(e.getFilePath())) {
+                        projectFileService.saveFile(projectId, e.getFilePath(), e.getContent());
+                    }
+                });
 
         chatEventRepository.saveAll(chatEventList);
     }

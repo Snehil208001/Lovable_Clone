@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,9 +18,11 @@ import java.util.regex.Pattern;
 @Slf4j
 public class LlmResponseParser {
 
+    // Deliberately case-SENSITIVE: the protocol tags are lowercase, while generated
+    // React code legitimately contains PascalCase <File>, <Tool> or <Message>
+    // components (e.g. lucide icons) that must not terminate or open a block.
     private static final Pattern OPEN_TAG_PATTERN = Pattern.compile(
-            "<(message|file|tool)((?:\\s[^>]*)?)>",
-            Pattern.CASE_INSENSITIVE
+            "<(message|file|tool)((?:\\s[^>]*)?)>"
     );
 
     // Some models close a block with their native tool-call template tag
@@ -43,18 +45,17 @@ public class LlmResponseParser {
         List<ChatEvent> events = new ArrayList<>();
         int orderCounter = 1;
 
-        String lowerResponse = fullResponse.toLowerCase(Locale.ROOT);
         Matcher opener = OPEN_TAG_PATTERN.matcher(fullResponse);
         int cursor = 0;
 
         while (opener.find(cursor)) {
-            String tagName = opener.group(1).toLowerCase(Locale.ROOT);
+            String tagName = opener.group(1);
             Map<String, String> attrMap = extractAttributes(opener.group(2));
             int contentStart = opener.end();
 
             String properCloser = "</" + tagName + ">";
-            int properIdx = lowerResponse.indexOf(properCloser, contentStart);
-            int strayIdx = lowerResponse.indexOf(STRAY_CLOSER, contentStart);
+            int properIdx = fullResponse.indexOf(properCloser, contentStart);
+            int strayIdx = fullResponse.indexOf(STRAY_CLOSER, contentStart);
             Matcher nextOpener = OPEN_TAG_PATTERN.matcher(fullResponse);
             int nextIdx = nextOpener.find(contentStart) ? nextOpener.start() : -1;
 
@@ -118,6 +119,50 @@ public class LlmResponseParser {
         }
         return true;
     }
+
+    /**
+     * File blocks that already have a proper {@code </file>} closer and whose path
+     * is not in {@code alreadyApplied}. Used for mid-stream persistence.
+     */
+    public List<ClosedFile> extractNewlyClosedFiles(String buffer, Set<String> alreadyApplied) {
+        List<ClosedFile> closed = new ArrayList<>();
+        if (buffer == null || buffer.isEmpty()) {
+            return closed;
+        }
+        Set<String> seen = alreadyApplied != null ? alreadyApplied : Set.of();
+
+        Matcher opener = OPEN_TAG_PATTERN.matcher(buffer);
+        int cursor = 0;
+        while (opener.find(cursor)) {
+            String tagName = opener.group(1);
+            Map<String, String> attrMap = extractAttributes(opener.group(2));
+            int contentStart = opener.end();
+            String properCloser = "</" + tagName + ">";
+            int properIdx = buffer.indexOf(properCloser, contentStart);
+
+            if (!"file".equals(tagName) || properIdx < 0) {
+                cursor = properIdx >= 0 ? properIdx + properCloser.length() : contentStart;
+                continue;
+            }
+
+            String path = attrMap.get("path");
+            String content = buffer.substring(contentStart, properIdx).trim();
+            if (content.startsWith("```")) {
+                content = content.replaceFirst("^```[a-zA-Z]*\\n?", "");
+                if (content.endsWith("```")) {
+                    content = content.substring(0, content.length() - 3).trim();
+                }
+            }
+
+            if (path != null && !path.isBlank() && !seen.contains(path)) {
+                closed.add(new ClosedFile(path, content));
+            }
+            cursor = properIdx + properCloser.length();
+        }
+        return closed;
+    }
+
+    public record ClosedFile(String path, String content) {}
 
     private Map<String, String> extractAttributes(String attributeString) {
         Map<String, String> attributes = new HashMap<>();

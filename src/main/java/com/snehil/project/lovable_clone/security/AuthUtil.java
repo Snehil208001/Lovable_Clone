@@ -18,6 +18,9 @@ public class AuthUtil {
     @Value("${jwt.secret-key}")
     private String jwtSecretKey;
 
+    @Value("${jwt.access-token-validity-minutes:720}")
+    private long accessTokenValidityMinutes;
+
     private SecretKey getSecretKey() {
         return Keys.hmacShaKeyFor(jwtSecretKey.getBytes(StandardCharsets.UTF_8));
     }
@@ -27,7 +30,7 @@ public class AuthUtil {
                 .subject(user.getUsername())
                 .claim("userId", user.getId().toString())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 10))
+                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * accessTokenValidityMinutes))
                 .signWith(getSecretKey())
                 .compact();
 

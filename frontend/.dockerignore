@@ -1,0 +1,12 @@
+.git
+.idea
+.cursor
+.agents
+.next
+node_modules
+npm-debug.log*
+*.md
+.env
+.env.*
+coverage
+.turbo

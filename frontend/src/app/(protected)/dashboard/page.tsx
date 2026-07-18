@@ -168,44 +168,50 @@ export default function DashboardPage() {
     ? Math.min(Math.round((usage.tokensUsed / usage.tokensLimit) * 100), 100) : 0;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-zinc-950 text-zinc-100">
-      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-zinc-950 to-zinc-950" />
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
+      {/* Premium background gradient and grids */}
+      <div className="pointer-events-none absolute inset-0 z-0 bg-grid-pattern opacity-[0.25]" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top_right,rgba(34,197,94,0.12),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.08),transparent_45%)]" />
+      
       <div className="relative z-10">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-zinc-950/70 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-white/5 bg-background/60 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <div className="grid size-9 place-items-center rounded-lg border border-indigo-400/30 bg-indigo-500/10 text-indigo-300">
-              <Sparkles className="size-4" />
+            <div className="grid size-9 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary shadow-glow-primary">
+              <Sparkles className="size-4.5" />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-wide">Lovable Clone</p>
-              <p className="text-xs text-zinc-400">AI App Generator</p>
+              <p className="text-sm font-bold tracking-wide bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">AuraCode</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">AI App Platform</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Link href="/billing">
               <Button
                 variant="outline"
                 size="sm"
-                className="border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                className="border-white/10 bg-zinc-900/60 text-foreground/80 hover:bg-zinc-800/80 hover:text-white rounded-xl h-9"
               >
-                <CreditCard className="mr-2 size-4" />
+                <CreditCard className="mr-2 size-4 text-muted-foreground" />
                 Billing
               </Button>
             </Link>
-            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/70 px-3 py-1.5">
-              <Avatar className="size-7 border border-white/10">
-                <AvatarFallback className="bg-zinc-800 text-xs text-zinc-200">
+            
+            <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-zinc-900/40 px-3 py-1.5 backdrop-blur-sm">
+              <Avatar className="size-6 border border-white/10">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-sky-500 text-[10px] font-bold text-white">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm text-zinc-300">{user?.name ?? user?.username}</span>
+              <span className="text-xs font-medium text-foreground/80">{user?.name ?? user?.username}</span>
             </div>
+
             <Button
               variant="outline"
+              size="sm"
               onClick={onLogout}
-              className="border-white/10 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-white"
+              className="border-white/10 bg-zinc-900/60 text-foreground/80 hover:bg-zinc-800/80 hover:text-red-400 rounded-xl h-9 transition-colors"
             >
               <LogOut className="mr-2 size-4" />
               Logout
@@ -218,51 +224,69 @@ export default function DashboardPage() {
         {/* ─── Usage Quick Stats ─── */}
         {usage && (
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
-            <Card className="border-white/10 bg-zinc-900/60">
-              <CardContent className="p-4 space-y-2">
+            <Card className="border-white/5 bg-zinc-900/40 backdrop-blur-md shadow-lg hover:border-white/10 transition-all duration-300">
+              <CardContent className="p-5 space-y-3.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Zap className="size-3.5 text-sky-400" /> AI Tokens Today
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    {limits?.unlimitedAi ? "∞" : `${usage.tokensUsed.toLocaleString()} / ${usage.tokensLimit.toLocaleString()}`}
+                  <div className="flex items-center gap-2">
+                    <div className="grid size-8 place-items-center rounded-lg bg-sky-500/10 text-sky-400">
+                      <Zap className="size-4" />
+                    </div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      AI Generation Limit
+                    </p>
+                  </div>
+                  <p className="text-xs font-bold text-foreground/80">
+                    {limits?.unlimitedAi ? "Unlimited" : `${usage.tokensUsed.toLocaleString()} / ${usage.tokensLimit.toLocaleString()}`}
                   </p>
                 </div>
                 {!limits?.unlimitedAi ? (
-                  <Progress value={tokenPercent} className="h-1.5 bg-zinc-800 [&>div]:bg-gradient-to-r [&>div]:from-indigo-500 [&>div]:to-sky-400" />
+                  <div className="space-y-1.5">
+                    <Progress value={tokenPercent} className="h-1.5 bg-zinc-800/80 rounded-full overflow-hidden [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-sky-400" />
+                    <p className="text-[10px] text-muted-foreground text-right">{tokenPercent}% Daily Tokens Used</p>
+                  </div>
                 ) : (
-                  <div className="h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-sky-400" />
+                  <div className="h-1.5 rounded-full bg-gradient-to-r from-primary to-sky-400" />
                 )}
               </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-zinc-900/60">
-              <CardContent className="p-4 space-y-2">
+            <Card className="border-white/5 bg-zinc-900/40 backdrop-blur-md shadow-lg hover:border-white/10 transition-all duration-300">
+              <CardContent className="p-5 space-y-3.5">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Previews Running</p>
-                  <p className="text-xs text-zinc-500">{usage.previewsRunning} / {usage.previewsLimit}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="grid size-8 place-items-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                      <Sparkles className="size-4" />
+                    </div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Previews</p>
+                  </div>
+                  <p className="text-xs font-bold text-foreground/80">{usage.previewsRunning} / {usage.previewsLimit}</p>
                 </div>
-                <Progress
-                  value={usage.previewsLimit > 0 ? Math.round((usage.previewsRunning / usage.previewsLimit) * 100) : 0}
-                  className="h-1.5 bg-zinc-800 [&>div]:bg-gradient-to-r [&>div]:from-emerald-500 [&>div]:to-teal-400"
-                />
+                <div className="space-y-1.5">
+                  <Progress
+                    value={usage.previewsLimit > 0 ? Math.round((usage.previewsRunning / usage.previewsLimit) * 100) : 0}
+                    className="h-1.5 bg-zinc-800/80 rounded-full overflow-hidden [&>div]:bg-gradient-to-r [&>div]:from-emerald-500 [&>div]:to-teal-400"
+                  />
+                  <p className="text-[10px] text-muted-foreground text-right">
+                    {usage.previewsLimit > 0 ? Math.round((usage.previewsRunning / usage.previewsLimit) * 100) : 0}% Preview Capacity
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
             {limits && (
-              <Card className="border-white/10 bg-zinc-900/60">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Current Plan</p>
-                    <p className="text-sm font-semibold text-zinc-200 mt-0.5">{limits.planeName}</p>
+              <Card className="border-white/5 bg-zinc-900/40 backdrop-blur-md shadow-lg hover:border-white/10 transition-all duration-300">
+                <CardContent className="p-5 flex items-center justify-between h-full">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Account Plan</p>
+                    <p className="text-sm font-bold text-primary">{limits.planeName}</p>
                   </div>
                   <Link href="/billing">
-                    <Button size="sm" variant="outline" className="border-white/10 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs h-8">
+                    <Button size="sm" variant="outline" className="border-primary/20 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground text-xs h-8.5 rounded-xl transition-all duration-200">
                       Upgrade
                     </Button>
                   </Link>
@@ -275,62 +299,66 @@ export default function DashboardPage() {
         {/* ─── Projects Header ─── */}
         <div className="mb-6 flex items-end justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Your Projects</h1>
-            <p className="text-sm text-zinc-400">
+            <h1 className="text-xl font-bold tracking-tight text-foreground">Your Projects</h1>
+            <p className="text-xs text-muted-foreground mt-1">
               Pick up where you left off or start building something new.
             </p>
           </div>
 
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-indigo-500 text-white hover:bg-indigo-400">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-[0_4px_15px_rgba(34,197,94,0.25)] hover:shadow-[0_4px_20px_rgba(34,197,94,0.35)] rounded-xl h-10 transition-all duration-200">
                 <Plus className="mr-2 size-4" />
                 New Project
               </Button>
             </DialogTrigger>
-            <DialogContent className="border-white/10 bg-zinc-950 text-zinc-50">
-              <DialogHeader>
-                <DialogTitle>Create a new project</DialogTitle>
-                <DialogDescription className="text-zinc-400">
+            <DialogContent className="border-white/10 bg-background/95 backdrop-blur-2xl text-foreground rounded-2xl max-w-md shadow-2xl">
+              <DialogHeader className="space-y-2">
+                <DialogTitle className="text-lg font-bold tracking-tight">Create a new project</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
                   Give your project a clear name to start generating code.
                 </DialogDescription>
               </DialogHeader>
               <form className="space-y-5" onSubmit={onCreateProject}>
                 <div className="space-y-2">
-                  <Label htmlFor="project-name">Project Name</Label>
+                  <Label htmlFor="project-name" className="text-xs text-foreground/80 font-medium">Project Name</Label>
                   <Input
                     id="project-name"
                     value={projectName}
                     onChange={(event) => setProjectName(event.target.value)}
-                    placeholder="SaaS Landing Page"
+                    placeholder="e.g., E-commerce Checkout Flow"
                     required
-                    className="border-white/10 bg-zinc-900/80"
+                    className="h-10 border-white/10 bg-zinc-900/60 focus:border-primary/50 focus:ring-primary-500/10 focus:ring-2 rounded-xl text-sm"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="project-description">Description</Label>
+                  <Label htmlFor="project-description" className="text-xs text-foreground/80 font-medium">Description (Optional)</Label>
                   <Textarea
                     id="project-description"
                     value={projectDescription}
                     onChange={(event) => setProjectDescription(event.target.value)}
-                    placeholder="Describe your app idea..."
-                    className="min-h-24 border-white/10 bg-zinc-900/80"
+                    placeholder="Describe your app idea, key features, styling preferences..."
+                    className="min-h-24 border-white/10 bg-zinc-900/60 focus:border-primary/50 focus:ring-primary-500/10 focus:ring-2 rounded-xl text-sm resize-none"
                   />
-                  <p className="text-xs text-zinc-500">
-                    Description helps AI understand the context better.
+                  <p className="text-[10px] text-muted-foreground">
+                    Description helps the AI understand the core layout requirements better.
                   </p>
                 </div>
-                {createError ? <p className="text-sm text-red-300">{createError}</p> : null}
-                <DialogFooter>
+                {createError ? <p className="text-xs text-red-400 font-medium">{createError}</p> : null}
+                <DialogFooter className="gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setIsCreateDialogOpen(false)}
-                    className="border-white/10 bg-zinc-900 hover:bg-zinc-800"
+                    className="border-white/10 bg-zinc-900 text-foreground/80 hover:bg-zinc-800 rounded-xl h-10"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isCreatingProject} className="bg-indigo-500 hover:bg-indigo-400">
+                  <Button
+                    type="submit"
+                    disabled={isCreatingProject}
+                    className="bg-primary text-primary-foreground hover:bg-emerald-400 font-bold rounded-xl h-10 px-5 shadow-lg active:scale-95 transition-all"
+                  >
                     {isCreatingProject ? (
                       <>
                         <Loader2 className="mr-2 size-4 animate-spin" />
@@ -350,75 +378,103 @@ export default function DashboardPage() {
         </div>
 
         {/* ─── Project Grid ─── */}
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           <button
             type="button"
             onClick={() => setIsCreateDialogOpen(true)}
-            className="group flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-white/20 bg-zinc-900/40 text-zinc-400 transition-all duration-300 hover:border-indigo-400/50 hover:bg-indigo-500/10 hover:text-indigo-200 hover:shadow-[0_0_30px_rgba(99,102,241,0.15)]"
+            className="group flex min-h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-zinc-900/10 text-muted-foreground transition-all duration-300 hover:border-primary/50 hover:bg-primary/5 hover:text-primary-200 hover:shadow-[0_0_30px_rgba(34,197,94,0.08)] cursor-pointer"
           >
-            <Plus className="mb-2 size-5 transition-transform group-hover:scale-110" />
-            <p className="text-sm font-medium">New Project</p>
+            <div className="grid size-10 place-items-center rounded-xl bg-zinc-900/60 border border-white/5 group-hover:border-primary/20 group-hover:bg-primary/10 text-muted-foreground group-hover:text-primary transition-all duration-300">
+              <Plus className="size-5 transition-transform group-hover:scale-110" />
+            </div>
+            <p className="text-xs font-semibold mt-3">Start a new project</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Prompt your application in natural language</p>
           </button>
 
           {isLoadingProjects ? (
-            <div className="col-span-full flex items-center justify-center py-20 text-zinc-400">
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Loading projects...
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground">
+              <Loader2 className="size-6 animate-spin text-primary" />
+              <p className="text-xs mt-3 text-muted-foreground">Loading projects...</p>
             </div>
           ) : null}
 
           {!isLoadingProjects &&
-            projects.map((project, index) => (
-              <motion.div
-                key={project.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: Math.min(index * 0.04, 0.2) }}
-              >
-                <Card
-                  className="cursor-pointer border-white/10 bg-zinc-900/60 transition-all hover:-translate-y-0.5 hover:border-indigo-300/30 hover:shadow-[0_0_24px_rgba(99,102,241,0.12)]"
-                  onClick={() => router.push(`/workspace/${project.id}`)}
+            projects.map((project, index) => {
+              const projectInitial = project.projectName ? project.projectName.charAt(0).toUpperCase() : "P";
+              return (
+                <motion.div
+                  key={project.id}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: Math.min(index * 0.04, 0.2) }}
                 >
-                  <CardContent className="space-y-3 p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="line-clamp-2 text-base font-medium text-zinc-100">
-                        {project.projectName}
-                      </h3>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="size-7 shrink-0 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800">
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="border-white/10 bg-zinc-900 text-zinc-100">
-                          <DropdownMenuItem
-                            className="text-red-400 focus:text-red-300 focus:bg-red-500/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void onDeleteProject(project.id);
-                            }}
-                            disabled={deletingId === project.id}
-                          >
-                            <Trash2 className="mr-2 size-4" />
-                            {deletingId === project.id ? "Deleting..." : "Delete Project"}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    {project.description && (
-                      <p className="text-xs text-zinc-500 line-clamp-2">{project.description}</p>
-                    )}
-                    <p className="text-xs text-zinc-400">
-                      Last modified {formatDate(project.updatedAt)}
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                  <Card
+                    className="group relative cursor-pointer border-white/5 bg-zinc-900/30 hover:bg-zinc-900/50 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_4px_30px_rgba(34,197,94,0.08)] overflow-hidden rounded-2xl"
+                    onClick={() => router.push(`/workspace/${project.id}`)}
+                  >
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(34,197,94,0.03),transparent_40%)]" />
+                    
+                    <CardContent className="space-y-4 p-5.5 relative z-10">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-sky-500 font-bold text-sm text-white select-none shadow-sm">
+                            {projectInitial}
+                          </div>
+                          <div>
+                            <h3 className="line-clamp-1 text-sm font-semibold text-foreground group-hover:text-white transition-colors">
+                              {project.projectName}
+                            </h3>
+                            <p className="text-[10px] text-muted-foreground">Project ID: #{project.id}</p>
+                          </div>
+                        </div>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-foreground/80 hover:bg-zinc-800 rounded-lg">
+                              <MoreVertical className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="border-white/10 bg-background text-foreground rounded-xl shadow-2xl">
+                            <DropdownMenuItem
+                              className="text-red-400 focus:text-red-300 focus:bg-red-500/10 rounded-lg cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void onDeleteProject(project.id);
+                              }}
+                              disabled={deletingId === project.id}
+                            >
+                              <Trash2 className="mr-2 size-4" />
+                              {deletingId === project.id ? "Deleting..." : "Delete Project"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {project.description ? (
+                        <p className="text-xs text-muted-foreground line-clamp-2 min-h-[32px] leading-relaxed">{project.description}</p>
+                      ) : (
+                        <p className="text-xs text-muted-600 italic line-clamp-2 min-h-[32px] leading-relaxed">No description provided for this project.</p>
+                      )}
+                      
+                      <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground border-t border-white/5">
+                        <span>Last active</span>
+                        <span className="font-medium text-muted-foreground">{formatDate(project.updatedAt)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
 
           {!isLoadingProjects && projects.length === 0 ? (
-            <div className="col-span-full rounded-xl border border-white/10 bg-zinc-900/50 p-8 text-center text-sm text-zinc-400">
-              No projects yet. Create your first project to open the AI workspace.
+            <div className="col-span-full rounded-2xl border border-white/5 bg-zinc-900/20 p-12 text-center text-sm text-muted-foreground backdrop-blur-sm flex flex-col items-center justify-center">
+              <div className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary mb-4">
+                <FolderCode className="size-6 animate-pulse" />
+              </div>
+              <h3 className="font-bold text-foreground/90">Create your first project</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-[280px] leading-relaxed">
+                You don&apos;t have any workspaces yet. Create one to begin coding apps with real-time preview canvas.
+              </p>
             </div>
           ) : null}
         </section>

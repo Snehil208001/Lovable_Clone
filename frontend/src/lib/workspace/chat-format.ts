@@ -23,20 +23,52 @@ const MESSAGE_END = /(?:<\/message>|<\/arg_value>|(?=<(?:file|message|tool)[\s>]
 export function formatChatContent(content: string): string {
   if (!content) return content;
   return content
-    .replace(new RegExp(`<file[^>]*path=(["'])([^"']+)\\1[^>]*>[\\s\\S]*?${FILE_END}`, "gi"), '\n\n📝 Updated $2\n')
-    .replace(new RegExp(`<tool[^>]*>[\\s\\S]*?${TOOL_END}`, "gi"), '')
-    .replace(new RegExp(`<message[^>]*>([\\s\\S]*?)${MESSAGE_END}`, "gi"), '\n$1\n')
-    // Streaming-safe fallbacks: tags whose closing tag has not arrived yet.
-    .replace(/<file[^>]*path=(["'])([^"']+)\1[^>]*>[\s\S]*$/i, '\n\n📝 Writing $2…\n')
-    .replace(/<tool[^>]*>[\s\S]*$/i, '')
-    .replace(/<message[^>]*>([\s\S]*)$/i, '\n$1')
-    // Scrub any dangling stray closers the rules above did not consume.
-    .replace(/<\/arg_value>/gi, '')
-    // A partially received tag at the very end of the buffer, e.g.
-    // `<file path="src/...` (attributes still streaming) or `<mess`.
-    .replace(/<\/?(?:file|tool|message)(?:\s[^>]*)?$/i, '')
-    .replace(/<\/?[a-z]{0,7}$/i, '')
+    .replace(
+      new RegExp(`<file[^>]*path=(["'])([^"']+)\\1[^>]*>[\\s\\S]*?${FILE_END}`, "gi"),
+      "\n\n[Wrote] $2\n",
+    )
+    .replace(
+      new RegExp(`<tool[^>]*args=(["'])([^"']+)\\1[^>]*>[\\s\\S]*?${TOOL_END}`, "gi"),
+      "\n[Reading] $2\n",
+    )
+    .replace(new RegExp(`<tool[^>]*>[\\s\\S]*?${TOOL_END}`, "gi"), "\n[Reading files]\n")
+    .replace(new RegExp(`<message[^>]*>([\\s\\S]*?)${MESSAGE_END}`, "gi"), "\n$1\n")
+    .replace(/<file[^>]*path=(["'])([^"']+)\1[^>]*>[\s\S]*$/i, "\n\n[Writing] $2…\n")
+    .replace(/<tool[^>]*args=(["'])([^"']+)\1[^>]*>[\s\S]*$/i, "\n[Reading] $2…\n")
+    .replace(/<tool[^>]*>[\s\S]*$/i, "\n[Reading files]…\n")
+    .replace(/<message[^>]*>([\s\S]*)$/i, "\n$1")
+    .replace(/<\/arg_value>/gi, "")
+    .replace(/<\/?(?:file|tool|message)(?:\s[^>]*)?$/i, "")
+    .replace(/<\/?[a-z]{0,7}$/i, "")
     .trim();
+}
+
+/** Structured timeline rows for the chat UI (reading / writing / done). */
+export type ChatTimelineItem =
+  | { kind: "text"; text: string }
+  | { kind: "action"; action: "reading" | "writing" | "wrote"; detail: string };
+
+export function parseChatTimeline(content: string): ChatTimelineItem[] {
+  const formatted = formatChatContent(content);
+  if (!formatted) return [];
+
+  const items: ChatTimelineItem[] = [];
+  for (const line of formatted.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const wrote = trimmed.match(/^\[Wrote\]\s+(.+)$/i);
+    const writing = trimmed.match(/^\[Writing\]\s+(.+?)(?:…|\.\.\.)?$/i);
+    const reading = trimmed.match(/^\[Reading\]\s+(.+?)(?:…|\.\.\.)?$/i);
+    if (wrote) items.push({ kind: "action", action: "wrote", detail: wrote[1] });
+    else if (writing) items.push({ kind: "action", action: "writing", detail: writing[1] });
+    else if (reading) items.push({ kind: "action", action: "reading", detail: reading[1] });
+    else if (/^\[Reading files\]/i.test(trimmed)) {
+      items.push({ kind: "action", action: "reading", detail: "project files" });
+    } else {
+      items.push({ kind: "text", text: trimmed });
+    }
+  }
+  return items;
 }
 
 export function delay(ms: number): Promise<void> {

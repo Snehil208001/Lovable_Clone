@@ -85,6 +85,28 @@ class LlmResponseParserTest {
     }
 
     @Test
+    void pascalCaseJsxComponentsInsideFileContentDoNotSplitTheBlock() {
+        // Generated React code legitimately contains <File>, <Tool> or <Message>
+        // PascalCase components (e.g. lucide icons). Tag matching is case-sensitive
+        // so they must stay part of the file content, not open/close protocol blocks.
+        String response = """
+                <file path="src/components/Inbox.tsx">import { File } from "lucide-react";
+                export function Inbox() {
+                  return <Message from="Ana"><File className="size-4" />attachment</Message>;
+                }</file>
+                <message phase="completed">Done!</message>
+                """;
+
+        List<ChatEvent> events = parser.parseChatEvents(response, null);
+
+        assertThat(events).hasSize(2);
+        assertThat(events.get(0).getType()).isEqualTo(ChatEventType.FILE_EDIT);
+        assertThat(events.get(0).getContent()).contains("<Message from=\"Ana\">")
+                .contains("</Message>");
+        assertThat(events.get(1).getContent()).isEqualTo("Done!");
+    }
+
+    @Test
     void stripsMarkdownFencesFromFileContent() {
         String response = "<file path=\"src/App.tsx\">```tsx\nconst a = 1;\n```</file>";
 

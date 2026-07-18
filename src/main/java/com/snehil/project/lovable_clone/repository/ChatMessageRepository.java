@@ -16,6 +16,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             ORDER BY m.createdAt ASC, e.sequenceOrder ASC
             """)
     List<ChatMessage> findByChatSession(ChatSession chatSession);
+
+    List<ChatMessage> findTop10ByChatSessionOrderByCreatedAtDesc(ChatSession chatSession);
+
+    List<ChatMessage> findTop20ByChatSessionOrderByCreatedAtDesc(ChatSession chatSession);
 }
 
 

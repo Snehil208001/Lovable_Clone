@@ -61,16 +61,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(apiError.status()).body(apiError);
     }
 
-    // Upstream AI provider (OpenRouter) rejected or failed the request — surface the real
-    // cause instead of a generic 500 so a bad OPENROUTER_API_KEY is diagnosable from the UI.
+    // Upstream AI provider rejected or failed the request — surface the real cause
+    // instead of a generic 500 so a bad OPENAI_API_KEY is diagnosable from the UI.
     @ExceptionHandler(org.springframework.web.reactive.function.client.WebClientResponseException.class)
     public ResponseEntity<ApiError> handleAiProviderError(
             org.springframework.web.reactive.function.client.WebClientResponseException ex) {
         String detail;
         if (ex.getStatusCode().value() == 401) {
-            detail = "AI provider rejected the API key (401 Unauthorized). Check the OPENROUTER_API_KEY environment variable.";
+            detail = "AI provider rejected the API key (401 Unauthorized). Check the OPENAI_API_KEY environment variable.";
         } else if (ex.getStatusCode().value() == 429) {
-            detail = "AI provider rate limit exceeded (429 Too Many Requests). The free model is congested or out of credits. Consider upgrading to a paid model or checking your OpenRouter quota/keys.";
+            detail = "AI provider rate limit exceeded (429 Too Many Requests). Check your OpenAI account credits/rate limits and try again shortly.";
         } else {
             detail = "AI provider request failed: " + ex.getStatusCode();
         }

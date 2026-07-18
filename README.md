@@ -36,6 +36,49 @@
 - **📂 MinIO Hybrid File Storage**: High-performance object storage for project file trees with a PostgreSQL database fallback.
 
 
+## 🌐 Production Environment (Live Deployment)
+
+The platform is deployed and running live on Azure Container Apps with the following endpoints:
+
+* **Frontend Web Application**: [https://auracode-web.whitemeadow-09bf00ac.centralus.azurecontainerapps.io](https://auracode-web.whitemeadow-09bf00ac.centralus.azurecontainerapps.io)
+* **Backend API Gateway**: [https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io](https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io)
+* **Swagger API Documentation**: [https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io/swagger-ui/index.html](https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io/swagger-ui/index.html)
+* **MinIO Object Storage Console**: [https://auracode-minio.whitemeadow-09bf00ac.centralus.azurecontainerapps.io](https://auracode-minio.whitemeadow-09bf00ac.centralus.azurecontainerapps.io)
+
+---
+
+## 📸 Production Gallery
+
+### 1. Interactive Prompt Execution (Live Walkthrough)
+The recorded demonstration below displays streaming AI code generation, automatic MinIO bucket writing, and instant live Sandpack compilation:
+
+<div align="center">
+  <img src="docs/assets/run-prompt-flow.webp" alt="AuraCode Live Prompt Walkthrough" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
+</div>
+
+### 2. Premium Pro Dashboard (Upgraded via Stripe Webhook)
+After a successful test subscription checkout via Stripe, our live Webhook endpoint processes the payload and upgrades the dashboard layout, introducing expanded token and active preview limits:
+
+<div align="center">
+  <img src="docs/assets/dashboard-pro.png" alt="AuraCode Pro Dashboard" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
+</div>
+
+### 3. Glassmorphic Calculator Workspace
+The code editor and live preview panel compiling a premium glassmorphic Scientific Calculator generated directly by the platform's AI:
+
+<div align="center">
+  <img src="docs/assets/workspace-todo.png" alt="Scientific Calculator Workspace" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
+</div>
+
+---
+
+## 📸 Application Demo
+
+The animation above showcases the user flow end-to-end:
+1. **Seamless Sign Up & Login** (JWT authentication).
+2. **Dashboard Project Creation** (metadata persistence & project seeding).
+3. **Workspace File Tree & Code Editor** (exploring files, real-time code preview).
+4. **Subscription Plan Upgrades** (Stripe-ready pricing layout).
 
 ---
 
@@ -113,6 +156,92 @@ Visit the app at **`http://localhost:5173`**.
 
 ---
 
+## ☁️ Production on Azure (Container Apps)
+
+**Primary cloud target.** Stack: **Azure Container Apps** (API + Next.js + MinIO) · **Azure Database for PostgreSQL** · **Key Vault** · **Azure Container Registry** · GitHub Actions.
+
+```text
+User → Container App (frontend) → Container App (backend) → Azure Postgres
+                                   → Container App (MinIO / S3 API)
+                                   → Key Vault / OpenAI / Stripe
+```
+
+> GCP scripts under [`deploy/gcp/`](deploy/gcp/) and [`cloudbuild.yaml`](cloudbuild.yaml) remain as an optional alternate; Azure is the documented path going forward.
+
+### Required environment variables
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE=prod` | Backend | Loads `application-prod.yml` |
+| `SPRING_DATASOURCE_URL` | Backend | Azure Postgres JDBC URL (`?sslmode=require`) |
+| `DB_USER` / `DB_PASSWORD` | Backend | Database credentials (Key Vault) |
+| `JWT_SECRET_KEY` | Backend | JWT HMAC secret (**32+ random bytes**; never commit) |
+| `OPENAI_API_KEY` | Backend | Spring AI / generation |
+| `STRIPE_API_KEY` / `STRIPE_WEBHOOK_SECRET` | Backend | Billing |
+| `CLIENT_URL` / `CORS_ALLOWED_ORIGINS` | Backend | Frontend origin |
+| `MINIO_URL` | Backend | MinIO Container App HTTPS URL |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | Backend | MinIO root credentials |
+| `MINIO_PROJECT_BUCKET` | Backend | Bucket name for project files |
+| `NEXT_PUBLIC_API_BASE_URL` | Frontend **build arg** | Absolute API URL (SSE + REST) |
+| `PORT` | Both | `8080` |
+
+Azure Postgres JDBC example:
+
+```text
+jdbc:postgresql://auracode-pg.postgres.database.azure.com:5432/auracode?sslmode=require
+```
+
+**Stripe webhook:** `https://<backend-fqdn>/webhooks/payment`  
+**Health:** `https://<backend-fqdn>/actuator/health`
+
+### Deploy with Azure CLI (recommended)
+
+1. Install [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) and run `az login`.
+2. Copy and fill config:
+
+```bash
+cp deploy/azure/config.env.example deploy/azure/config.env
+# SUBSCRIPTION_ID, LOCATION, ACR_NAME, KEY_VAULT_NAME, DB_PASSWORD,
+# JWT_SECRET_KEY, OPENAI_API_KEY, MINIO_SECRET_KEY, STRIPE_*, etc.
+```
+
+3. Bootstrap infrastructure, then apps (Git Bash / WSL / Azure Cloud Shell):
+
+```bash
+bash deploy/azure/bootstrap.sh
+bash deploy/azure/06-deploy-minio.sh
+bash deploy/azure/07-deploy-backend.sh      # FRONTEND_URL may be temporary
+bash deploy/azure/08-deploy-frontend.sh
+# FRONTEND_URL is written to config.env — re-run backend for CORS:
+bash deploy/azure/07-deploy-backend.sh
+```
+
+4. Point Stripe at `https://<backend>/webhooks/payment`, store the signing secret in Key Vault / `config.env`, redeploy backend.
+
+Scripts: [`deploy/azure/`](deploy/azure/). CI: [`.github/workflows/azure-container-apps.yml`](.github/workflows/azure-container-apps.yml).
+
+### Browser (Azure Portal) quick path
+
+1. Portal → create Resource Group + Container Registry + PostgreSQL Flexible Server + Key Vault.  
+2. Open **Cloud Shell**, clone the repo, fill `deploy/azure/config.env`, run the same `bootstrap` / `06`–`08` scripts above.  
+3. Apps appear under **Container Apps**; open the frontend FQDN in the browser.
+
+### Local production-image smoke test
+
+```bash
+export JWT_SECRET_KEY="replace-with-long-random-secret"
+export OPENAI_API_KEY="sk-..."
+docker compose -f docker-compose.prod.yml up --build
+```
+
+- API: `http://localhost:8080` (`/actuator/health`)
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- Web: `http://localhost:3000`
+
+Dockerfiles: [`Dockerfile.backend`](Dockerfile.backend), [`frontend/Dockerfile`](frontend/Dockerfile).
+
+---
+
 ## 📈 Roadmap & Progress
 - [x] **Auth & RBAC**: JWT login/signup with project-level permissions.
 - [x] **Project Management**: Project creation, deletion, and dashboard UI.
@@ -122,6 +251,24 @@ Visit the app at **`http://localhost:5173`**.
 - [x] **Usage Guardrails**: Token quotas and active preview limits.
 - [x] **Team Collaboration**: Invite system with Owner, Editor, Viewer roles.
 - [ ] **One-Click Deployments**: Direct deployment of generated apps to Vercel/Netlify.
+- [ ] **📱 Android Mobile Client**: Native Android application for AuraCode with live previews, biometric login, and project sharing.
+
+---
+
+## 📱 Next Phase: Android Mobile Client
+
+To extend AuraCode to mobile environments, the next phase is building the **AuraCode Android Client**.
+
+### Key Features:
+* **Mobile Workspace**: Prompt and preview your web applications directly on your phone or tablet.
+* **Biometric Authentication**: Secure JWT session verification via fingerprint or face unlock.
+* **Offline Caching**: Local caching of projects, files, and chat history.
+* **Instant Collaboration**: Share live preview links with team members via native share sheets.
+
+<div align="center">
+  <img src="docs/assets/android-preview.png" alt="AuraCode Android App Preview" width="320" style="border-radius: 20px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
+  <p><i>Sleek mobile dashboard and code preview generator (Coming Soon!)</i></p>
+</div>
 
 ---
 

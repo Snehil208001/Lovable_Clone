@@ -52,7 +52,8 @@ export function useWorkspaceBootstrap(
 
         const { setActiveProject, setMessages } = useWorkspaceStore.getState();
         setActiveProject(projectResponse.data);
-        if (!persistedMessagesRef.current?.length) {
+        // Server history wins over stale localStorage so reloads match the DB.
+        if (chatData.length > 0) {
           setMessages(
             chatData.flatMap((message) =>
               isRenderableChatRole(message.role)
@@ -60,6 +61,8 @@ export function useWorkspaceBootstrap(
                 : [],
             ),
           );
+        } else if (persistedMessagesRef.current?.length) {
+          setMessages(persistedMessagesRef.current);
         }
         const initialPaths = await loadFileTree(true);
         await refreshPreview(initialPaths);

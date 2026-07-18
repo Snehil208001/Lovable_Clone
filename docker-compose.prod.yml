@@ -1,0 +1,72 @@
+# Local smoke of production images against local Postgres + MinIO (or Cloud SQL Auth Proxy).
+# Usage:
+#   export JWT_SECRET_KEY=... OPENAI_API_KEY=... STRIPE_API_KEY=... DB_PASSWORD=...
+#   docker compose -f docker-compose.prod.yml up --build
+#
+# Point SPRING_DATASOURCE_URL at Cloud SQL Auth Proxy (127.0.0.1:5432) if desired.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_DB: auracode
+      POSTGRES_USER: auracode
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-auracode}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auracode -d auracode"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auracode
+      DB_USER: auracode
+      DB_PASSWORD: ${DB_PASSWORD:-auracode}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-to-a-long-random-secret-at-least-32-bytes}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STRIPE_API_KEY: ${STRIPE_API_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_DEFAULT_PRICE_ID: ${STRIPE_DEFAULT_PRICE_ID:-}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      MINIO_URL: http://minio:9000
+      MINIO_REGION: us-east-1
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_PROJECT_BUCKET: ${MINIO_PROJECT_BUCKET:-auracode-projects}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+    ports:
+      - "3000:8080"
+    depends_on:
+      - backend
