@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Logo } from "@/components/logo";
 
 export function AuthShell({
   title,
@@ -26,12 +26,7 @@ export function AuthShell({
         className="relative z-10 w-full max-w-md rounded-2xl border border-border/80 bg-card/70 p-8 shadow-glow-primary backdrop-blur-2xl"
       >
         <div className="mb-8 space-y-4">
-          <div className="flex items-center gap-2.5">
-            <div className="grid size-9 place-items-center rounded-lg border border-primary/30 bg-primary/10 text-primary shadow-glow-primary">
-              <Sparkles className="size-4" />
-            </div>
-            <span className="font-heading text-lg font-bold tracking-tight text-foreground">AuraCode</span>
-          </div>
+          <Logo size="md" href="/" />
           <div>
             <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>

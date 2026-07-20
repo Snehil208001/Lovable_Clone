@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 import { useAuthStore } from "@/stores/auth-store";
 
 export default function HomePage() {
@@ -33,12 +34,7 @@ export default function HomePage() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_-10%,rgba(34,197,94,0.16),transparent)]" />
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 md:px-10">
-        <div className="flex items-center gap-2">
-          <span className="grid size-8 place-items-center rounded-lg border border-primary/30 bg-primary/10 text-primary">
-            <Sparkles className="size-4" />
-          </span>
-          <span className="font-heading text-lg font-bold tracking-tight">AuraCode</span>
-        </div>
+        <Logo size="md" href="/" />
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm">
             <Link href="/login">Log in</Link>

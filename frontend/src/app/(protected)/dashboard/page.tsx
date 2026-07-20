@@ -19,6 +19,7 @@ import {
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -176,15 +177,7 @@ export default function DashboardPage() {
       <div className="relative z-10">
       <header className="sticky top-0 z-20 border-b border-white/5 bg-background/60 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <div className="grid size-9 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary shadow-glow-primary">
-              <Sparkles className="size-4.5" />
-            </div>
-            <div>
-              <p className="text-sm font-bold tracking-wide bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">AuraCode</p>
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">AI App Platform</p>
-            </div>
-          </div>
+          <Logo size="md" href="/dashboard" />
 
           <div className="flex items-center gap-4">
             <Link href="/billing">

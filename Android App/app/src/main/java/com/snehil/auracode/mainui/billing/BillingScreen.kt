@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -193,7 +194,11 @@ private fun CurrentSubscriptionCard(
                 modifier = Modifier.fillMaxWidth().height(46.dp)
             ) {
                 if (portalLoading) {
-                    CircularProgressIndicator(color = Primary, strokeWidth = 2.dp, modifier = Modifier.height(20.dp))
+                    CircularProgressIndicator(
+                        color = Primary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
                 } else {
                     Text("Manage subscription", color = MaterialTheme.colorScheme.onSurface)
                 }
@@ -284,7 +289,11 @@ private fun PlanCard(
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = plan.price ?: plan.amountInr?.let { "₹$it" } ?: "—",
+                    text = when {
+                        plan.amountInr != null && plan.amountInr > 0 -> "₹${plan.amountInr.toInt()}"
+                        !plan.price.isNullOrBlank() -> plan.price
+                        else -> "—"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Primary
@@ -303,6 +312,7 @@ private fun PlanCard(
             PlanFeature(if (plan.unlimitedAi) "Unlimited AI tokens" else "${plan.maxTokensPerDay} tokens / day")
 
             val isFree = (plan.amountInr ?: 0.0) <= 0.0 && plan.price.isNullOrBlank()
+            val cashfreeEnabled = (plan.amountInr ?: 0.0) > 0.0
             if (!isCurrent && !isFree) {
                 Spacer(Modifier.height(14.dp))
                 PrimaryButton(
@@ -312,17 +322,23 @@ private fun PlanCard(
                     enabled = checkoutLoadingKey == null,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { onCheckout(PaymentProvider.CASHFREE) },
-                    enabled = checkoutLoadingKey == null,
-                    border = BorderStroke(1.dp, BorderColor),
-                    modifier = Modifier.fillMaxWidth().height(46.dp)
-                ) {
-                    if (checkoutLoadingKey == "${PaymentProvider.CASHFREE.apiValue}-${plan.id}") {
-                        CircularProgressIndicator(color = Primary, strokeWidth = 2.dp, modifier = Modifier.height(20.dp))
-                    } else {
-                        Text("Pay via UPI / Cashfree", color = MaterialTheme.colorScheme.onSurface)
+                if (cashfreeEnabled) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { onCheckout(PaymentProvider.CASHFREE) },
+                        enabled = checkoutLoadingKey == null,
+                        border = BorderStroke(1.dp, BorderColor),
+                        modifier = Modifier.fillMaxWidth().height(46.dp)
+                    ) {
+                        if (checkoutLoadingKey == "${PaymentProvider.CASHFREE.apiValue}-${plan.id}") {
+                            CircularProgressIndicator(
+                                color = Primary,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        } else {
+                            Text("Pay via UPI / Cashfree", color = MaterialTheme.colorScheme.onSurface)
+                        }
                     }
                 }
             }

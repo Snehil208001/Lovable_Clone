@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 /**
  * Ensures at least one active {@link Plan} exists when a default Stripe Price ID and/or
  * Cashfree INR amount is configured (so checkout with {@code planId: 1} works on a fresh DB).
+ * Also keeps {@code amount_inr} in sync with {@code CASHFREE_DEFAULT_AMOUNT_INR}.
  */
 @Component
 @Order(1) // before StripePlanPriceValidator, which checks the seeded rows
@@ -31,7 +32,7 @@ public class BillingPlansInitializer implements ApplicationRunner {
     @Value("${billing.default-plan.stripe-price-id:}")
     private String defaultStripePriceId;
 
-    @Value("${billing.default-plan.amount-inr:0}")
+    @Value("${billing.default-plan.amount-inr:699}")
     private BigDecimal defaultAmountInr;
 
     @Override
@@ -41,7 +42,7 @@ public class BillingPlansInitializer implements ApplicationRunner {
 
         if (planRepository.count() > 0) {
             if (hasCashfree) {
-                backfillAmountInr();
+                syncAmountInr();
             }
             return;
         }
@@ -75,12 +76,18 @@ public class BillingPlansInitializer implements ApplicationRunner {
                 hasCashfree ? defaultAmountInr : null);
     }
 
-    private void backfillAmountInr() {
+    /** Keep Cashfree INR amount aligned with env (e.g. 699) even if an older value was stored. */
+    private void syncAmountInr() {
         for (Plan plan : planRepository.findAll()) {
-            if (plan.getAmountInr() == null) {
+            if (plan.getAmountInr() == null || plan.getAmountInr().compareTo(defaultAmountInr) != 0) {
+                BigDecimal previous = plan.getAmountInr();
                 plan.setAmountInr(defaultAmountInr);
                 planRepository.save(plan);
-                log.info("Backfilled amount_inr={} on plan id={}", defaultAmountInr, plan.getId());
+                log.info(
+                        "Synced amount_inr on plan id={} from {} to {}",
+                        plan.getId(),
+                        previous,
+                        defaultAmountInr);
             }
         }
     }

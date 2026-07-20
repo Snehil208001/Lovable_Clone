@@ -52,9 +52,15 @@ public class BillingController {
     @PostMapping("/api/payments/checkout")
     public ResponseEntity<CheckoutResponse> createCheckoutResponse(
             @RequestBody CheckoutRequest request,
+            @RequestParam(value = "provider", required = false) String providerParam,
             @AuthenticationPrincipal JwtUserPrincipal currentUser
     ) {
-        String provider = StringUtils.hasText(request.provider()) ? request.provider().trim().toUpperCase() : "STRIPE";
+        String fromBody = request.provider();
+        String fromQuery = providerParam;
+        String provider = StringUtils.hasText(fromBody)
+                ? fromBody.trim().toUpperCase()
+                : (StringUtils.hasText(fromQuery) ? fromQuery.trim().toUpperCase() : "STRIPE");
+        log.info("Checkout requested provider={} planId={} userId={}", provider, request.planId(), currentUser.userId());
         if ("CASHFREE".equals(provider)) {
             return ResponseEntity.ok(cashfreePaymentService.createCheckoutSession(request, currentUser.userId()));
         }

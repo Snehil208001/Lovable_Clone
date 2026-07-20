@@ -75,7 +75,7 @@ private fun CheckoutWebView(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    val webView = remember {
+    val webView = remember(target) {
         WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true

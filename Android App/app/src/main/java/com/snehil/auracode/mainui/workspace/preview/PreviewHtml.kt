@@ -228,6 +228,45 @@ internal object PreviewHtml {
         window.visualViewport.addEventListener("resize", auraFixLayout);
       }
 
+      // Watch Sandpack / runtime error surfaces and report once for auto-fix.
+      var lastErr = "";
+      function auraReportOnce(msg) {
+        var t = String(msg || "").trim();
+        if (!t || t === lastErr) return;
+        lastErr = t;
+        auraFail(t);
+      }
+      function auraScanErrors() {
+        try {
+          var nodes = document.querySelectorAll(
+            ".sp-overlay, .sp-message, .sp-error-message, [class*='ErrorMessage'], [class*='error-message']"
+          );
+          for (var i = 0; i < nodes.length; i++) {
+            var el = nodes[i];
+            var style = window.getComputedStyle(el);
+            if (style && (style.display === "none" || style.visibility === "hidden")) continue;
+            var text = (el.innerText || el.textContent || "").trim();
+            if (text.length > 24 && /error|invalid|undefined|failed|cannot|module/i.test(text)) {
+              auraReportOnce(text.slice(0, 1200));
+              return;
+            }
+          }
+          var iframe = document.querySelector("iframe.sp-preview-iframe, .sp-preview-iframe, iframe");
+          if (iframe) {
+            try {
+              var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+              if (doc) {
+                var bodyText = (doc.body && (doc.body.innerText || doc.body.textContent) || "").trim();
+                if (/Element type is invalid|Check the render method|is not defined|Module not found|Failed to compile/i.test(bodyText)) {
+                  auraReportOnce(bodyText.slice(0, 1200));
+                }
+              }
+            } catch (cross) { /* cross-origin — rely on console bridge */ }
+          }
+        } catch (scanErr) {}
+      }
+      setInterval(auraScanErrors, 1500);
+
       var attempts = 0;
       var timer = setInterval(function () {
         attempts += 1;

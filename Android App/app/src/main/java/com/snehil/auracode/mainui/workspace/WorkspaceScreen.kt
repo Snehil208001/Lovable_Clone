@@ -26,8 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.zIndex
 import com.snehil.auracode.mainui.workspace.chat.ChatScreen
 import com.snehil.auracode.mainui.workspace.code.CodeScreen
 import com.snehil.auracode.mainui.workspace.preview.PreviewScreen
@@ -91,13 +93,33 @@ fun WorkspaceScreen(
         }
     ) { padding ->
         AuraBackground {
+            // Keep all tabs composed so Preview WebView + chat state survive switches.
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                when (selectedTab) {
-                    WorkspaceTab.CHAT -> ChatScreen()
-                    WorkspaceTab.PREVIEW -> PreviewScreen()
-                    WorkspaceTab.CODE -> CodeScreen()
+                KeepAlivePane(visible = selectedTab == WorkspaceTab.CHAT) {
+                    ChatScreen()
+                }
+                KeepAlivePane(visible = selectedTab == WorkspaceTab.PREVIEW) {
+                    PreviewScreen()
+                }
+                KeepAlivePane(visible = selectedTab == WorkspaceTab.CODE) {
+                    CodeScreen()
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun KeepAlivePane(
+    visible: Boolean,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(if (visible) 1f else 0f)
+            .graphicsLayer { alpha = if (visible) 1f else 0f }
+    ) {
+        content()
     }
 }

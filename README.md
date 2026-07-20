@@ -1,6 +1,7 @@
 # 🚀 Lovable Clone — Full-Stack AI App Generator
 
 <div align="center">
+  <img src="docs/assets/logo.png" alt="AuraCode Common Logo" width="160" style="border-radius: 20px; margin-bottom: 16px;" />
 
   <p align="center">
     <b>A powerful, full-stack AI-powered application generation platform inspired by <a href="https://lovable.dev">Lovable</a>.</b><br />

@@ -24,11 +24,16 @@ private val wroteLineRegex = Regex("""^\[Wrote\]\s+(.+)$""", RegexOption.IGNORE_
 private val writingLineRegex = Regex("""^\[Writing\]\s+(.+?)(?:…|\.\.\.)?$""", RegexOption.IGNORE_CASE)
 private val readingLineRegex = Regex("""^\[Reading\]\s+(.+?)(?:…|\.\.\.)?$""", RegexOption.IGNORE_CASE)
 private val readingFilesRegex = Regex("""^\[Reading files\]""", RegexOption.IGNORE_CASE)
+private val fencedCodeRegex = Regex("""```[\w+\-]*\n?[\s\S]*?```""")
+private val partialFenceRegex = Regex("""```[\w+\-]*\n?[\s\S]*$""")
+private val rawTagRegex = Regex("""</?(?:file|tool|message|arg_value)(?:\s[^>]*)?/?>""", RegexOption.IGNORE_CASE)
 
-/** Strip XML tool tags and normalize assistant output for display. */
+/** Strip XML/tool/code payloads — chat shows vibe activity, not source. */
 fun formatChatContent(content: String): String {
     if (content.isBlank()) return content
     return content
+        .replace(fencedCodeRegex, "\n")
+        .replace(partialFenceRegex, "\n")
         .replace(fileBlockRegex, "\n\n[Wrote] $2\n")
         .replace(toolArgsBlockRegex, "\n[Reading] $2\n")
         .replace(toolBlockRegex, "\n[Reading files]\n")
@@ -37,13 +42,16 @@ fun formatChatContent(content: String): String {
         .replace(toolArgsPartialRegex, "\n[Reading] $2…\n")
         .replace(toolPartialRegex, "\n[Reading files]…\n")
         .replace(messagePartialRegex, "\n$1")
-        .replace(Regex("""</arg_value>""", RegexOption.IGNORE_CASE), "")
-        .replace(Regex("""</?(?:file|tool|message)(?:\s[^>]*)?$""", RegexOption.IGNORE_CASE), "")
-        .replace(Regex("""</?[a-z]{0,7}$""", RegexOption.IGNORE_CASE), "")
+        .replace(rawTagRegex, "")
+        .replace(Regex("""</?[a-z]{0,12}$""", RegexOption.IGNORE_CASE), "")
         .trim()
 }
 
-fun parseChatTimeline(content: String): List<ChatTimelineItem> {
+/**
+ * @param complete when true (stream finished), unfinished [Writing] rows become Applied
+ * and duplicate Exploring/Building rows for the same file collapse to Applied.
+ */
+fun parseChatTimeline(content: String, complete: Boolean = false): List<ChatTimelineItem> {
     val formatted = formatChatContent(content)
     if (formatted.isBlank()) return emptyList()
 
@@ -53,15 +61,54 @@ fun parseChatTimeline(content: String): List<ChatTimelineItem> {
         if (trimmed.isEmpty()) continue
         when {
             wroteLineRegex.matches(trimmed) ->
-                items += ChatTimelineItem.Action(ChatAction.WROTE, wroteLineRegex.matchEntire(trimmed)!!.groupValues[1])
-            writingLineRegex.matches(trimmed) ->
-                items += ChatTimelineItem.Action(ChatAction.WRITING, writingLineRegex.matchEntire(trimmed)!!.groupValues[1])
+                items += ChatTimelineItem.Action(ChatAction.WROTE, shortPath(wroteLineRegex.matchEntire(trimmed)!!.groupValues[1]))
+            writingLineRegex.matches(trimmed) -> {
+                val path = shortPath(writingLineRegex.matchEntire(trimmed)!!.groupValues[1])
+                // Incomplete </file> tags stay as Writing while streaming; settle to Applied when done.
+                items += ChatTimelineItem.Action(
+                    if (complete) ChatAction.WROTE else ChatAction.WRITING,
+                    path
+                )
+            }
             readingLineRegex.matches(trimmed) ->
-                items += ChatTimelineItem.Action(ChatAction.READING, readingLineRegex.matchEntire(trimmed)!!.groupValues[1])
+                items += ChatTimelineItem.Action(ChatAction.READING, shortPath(readingLineRegex.matchEntire(trimmed)!!.groupValues[1]))
             readingFilesRegex.containsMatchIn(trimmed) ->
                 items += ChatTimelineItem.Action(ChatAction.READING, "project files")
+            looksLikeCode(trimmed) -> Unit // vibe coding: never dump source into chat
             else -> items += ChatTimelineItem.Text(trimmed)
         }
     }
-    return items
+    return if (complete) settleTimeline(items) else items
+}
+
+/** Keep prose + one strongest action per file (Applied > Building > Exploring). */
+private fun settleTimeline(items: List<ChatTimelineItem>): List<ChatTimelineItem> {
+    val texts = items.filterIsInstance<ChatTimelineItem.Text>()
+    val bestByFile = linkedMapOf<String, ChatTimelineItem.Action>()
+    for (action in items.filterIsInstance<ChatTimelineItem.Action>()) {
+        val prev = bestByFile[action.detail]
+        if (prev == null || actionRank(action.action) >= actionRank(prev.action)) {
+            bestByFile[action.detail] = action
+        }
+    }
+    return texts + bestByFile.values
+}
+
+private fun actionRank(action: ChatAction): Int = when (action) {
+    ChatAction.WROTE -> 3
+    ChatAction.WRITING -> 2
+    ChatAction.READING -> 1
+}
+
+fun shortPath(path: String): String =
+    path.trim().removePrefix("/").substringAfterLast('/').ifBlank { path }
+
+private fun looksLikeCode(line: String): Boolean {
+    val t = line.trim()
+    if (t.startsWith("```") || t.endsWith("```")) return true
+    if (t.startsWith("<") && t.contains(">")) return true
+    if (Regex("""^(import|export|from|const|let|var|function|class|type|interface|return)\b""").containsMatchIn(t)) return true
+    if (t.contains("{") && t.contains("}") && t.length > 48) return true
+    val symbols = t.count { it in "{}();=<>[]" }
+    return symbols >= 4 && symbols * 3 >= t.length
 }

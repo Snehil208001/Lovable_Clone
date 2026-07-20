@@ -87,19 +87,38 @@ class BillingViewModel @Inject constructor(
             when (val res = createCheckout(planId, provider.apiValue)) {
                 is Resource.Success -> {
                     val session = res.data
-                    val target: CheckoutTarget? = when {
-                        !session.checkoutUrl.isNullOrBlank() -> CheckoutTarget.Url(session.checkoutUrl!!)
-                        !session.paymentSessionId.isNullOrBlank() -> CheckoutTarget.Cashfree(
-                            sessionId = session.paymentSessionId!!,
-                            sandbox = session.cashfreeEnv.equals("sandbox", ignoreCase = true)
-                        )
-                        else -> null
+                    // Route by the provider the user tapped — never prefer a Stripe URL
+                    // when Cashfree was requested (mirrors web billing page).
+                    val target: CheckoutTarget? = when (provider) {
+                        PaymentProvider.CASHFREE -> {
+                            val sessionId = session.paymentSessionId
+                            if (!sessionId.isNullOrBlank()) {
+                                CheckoutTarget.Cashfree(
+                                    sessionId = sessionId,
+                                    sandbox = session.cashfreeEnv.equals("sandbox", ignoreCase = true)
+                                )
+                            } else {
+                                null
+                            }
+                        }
+                        PaymentProvider.STRIPE -> {
+                            session.checkoutUrl?.takeIf { it.isNotBlank() }?.let { CheckoutTarget.Url(it) }
+                        }
+                    }
+                    val error = when {
+                        target != null -> null
+                        provider == PaymentProvider.CASHFREE && !session.checkoutUrl.isNullOrBlank() ->
+                            "Server returned Stripe checkout instead of Cashfree. Restart the backend and try again."
+                        provider == PaymentProvider.CASHFREE ->
+                            "Cashfree session missing. Set CASHFREE_APP_ID, CASHFREE_SECRET_KEY, and plan amount_inr."
+                        else ->
+                            "Stripe did not return a checkout URL."
                     }
                     _state.update {
                         it.copy(
                             checkoutLoadingKey = null,
                             checkoutTarget = target,
-                            actionError = if (target == null) "Could not start checkout." else null
+                            actionError = error
                         )
                     }
                 }

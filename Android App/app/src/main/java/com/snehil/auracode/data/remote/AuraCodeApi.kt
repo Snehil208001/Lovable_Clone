@@ -24,6 +24,7 @@ import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface AuraCodeApi {
 
@@ -77,7 +78,10 @@ interface AuraCodeApi {
     suspend fun getUsageLimits(): PlanLimitsDto
 
     @POST("api/payments/checkout")
-    suspend fun createCheckout(@Body body: CheckoutRequest): CheckoutResponse
+    suspend fun createCheckout(
+        @Query("provider") provider: String,
+        @Body body: CheckoutRequest
+    ): CheckoutResponse
 
     @POST("api/payments/portal")
     suspend fun openPortal(): PortalResponse

@@ -64,10 +64,17 @@ stripe:
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET:}
 
+cashfree:
+  app-id: ${CASHFREE_APP_ID:}
+  secret-key: ${CASHFREE_SECRET_KEY:}
+  env: ${CASHFREE_ENV:PRODUCTION}
+  notify-url: ${CASHFREE_NOTIFY_URL:}
+
 billing:
   default-plan:
     name: Pro
     stripe-price-id: ${STRIPE_DEFAULT_PRICE_ID:}
+    amount-inr: ${CASHFREE_DEFAULT_AMOUNT_INR:699}
 
 client:
   url: ${CLIENT_URL}

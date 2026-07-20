@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -75,7 +76,7 @@ fun PrimaryButton(
                 CircularProgressIndicator(
                     color = PrimaryForeground,
                     strokeWidth = 2.dp,
-                    modifier = Modifier.height(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             } else {
                 Text(

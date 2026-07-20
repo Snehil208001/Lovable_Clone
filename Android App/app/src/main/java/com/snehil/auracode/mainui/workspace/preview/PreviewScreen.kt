@@ -15,59 +15,88 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloseFullscreen
+import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
+import com.snehil.auracode.ui.components.PrimaryButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.key
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.snehil.auracode.ui.components.ErrorState
 import com.snehil.auracode.ui.theme.Background
+import com.snehil.auracode.ui.theme.CardSurface
+import com.snehil.auracode.ui.theme.MutedForeground
 import com.snehil.auracode.ui.theme.Primary
 import kotlinx.coroutines.delay
 
 @Composable
 fun PreviewScreen(viewModel: PreviewViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var fullscreen by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.loading, state.error, state.payloadJson, state.status) {
+    LaunchedEffect(Unit) {
+        viewModel.onAppear()
+    }
+
+    LaunchedEffect(state.loading, state.error, state.payloadJson, state.status, state.autoFixing) {
         PreviewLog.i(
             "uiState loading=${state.loading} error=${state.error != null} " +
                 "payload=${state.payloadJson != null} bytes=${state.payloadBytes} " +
-                "files=${state.fileCount} key=${state.renderKey} status=${state.status}"
+                "files=${state.fileCount} key=${state.renderKey} status=${state.status} " +
+                "autoFix=${state.autoFixing}"
         )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            state.loading -> {
-                PreviewLoadingOverlay(status = state.status)
+            state.loading && !state.autoFixing -> {
+                PreviewQuietStatus(status = state.status)
             }
 
-            state.error != null -> {
-                ErrorState(message = state.error!!, onRetry = viewModel::load)
+            state.error != null && !state.autoFixing && state.payloadJson == null -> {
+                ErrorState(
+                    message = state.error!!,
+                    onRetry = {
+                        if (state.repairStuck) viewModel.retryAutoFix() else viewModel.load()
+                    }
+                )
             }
 
             state.payloadJson != null -> {
@@ -77,7 +106,9 @@ fun PreviewScreen(viewModel: PreviewViewModel = hiltViewModel()) {
                     onRefresh = {
                         PreviewLog.i("manual refresh tapped")
                         viewModel.load()
-                    }
+                    },
+                    onFullscreen = { fullscreen = true },
+                    onRuntimeError = viewModel::onRuntimeError
                 )
             }
 
@@ -86,23 +117,197 @@ fun PreviewScreen(viewModel: PreviewViewModel = hiltViewModel()) {
                 ErrorState(message = "Preview has no data. Tap retry.", onRetry = viewModel::load)
             }
         }
+
+        if (state.autoFixing) {
+            AutoFixOverlay(status = state.autoFixStatus.ifBlank { "AuraCode is fixing the preview…" })
+        } else if (state.refreshing && state.payloadJson != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp)
+                    .background(CardSurface.copy(alpha = 0.95f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "Updating preview…",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Primary
+                )
+            }
+        }
+
+        if (state.repairStuck && !state.autoFixing) {
+            RepairStuckBanner(
+                onFixAgain = viewModel::retryAutoFix,
+                onDismiss = viewModel::dismissRepairStuck
+            )
+        }
+    }
+
+    if (fullscreen && state.payloadJson != null) {
+        Dialog(
+            onDismissRequest = { fullscreen = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            BackHandler { fullscreen = false }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Background)
+            ) {
+                key("fs-${state.renderKey}") {
+                    SandpackWebView(
+                        payloadJson = state.payloadJson.orEmpty(),
+                        renderKey = state.renderKey,
+                        onRuntimeError = viewModel::onRuntimeError,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                if (state.autoFixing) {
+                    AutoFixOverlay(status = state.autoFixStatus.ifBlank { "AuraCode is fixing the preview…" })
+                }
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .background(CardSurface.copy(alpha = 0.92f), RoundedCornerShape(12.dp))
+                ) {
+                    IconButton(onClick = {
+                        PreviewLog.i("fullscreen refresh tapped")
+                        viewModel.load()
+                    }) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = Primary)
+                    }
+                    IconButton(onClick = { fullscreen = false }) {
+                        Icon(Icons.Outlined.CloseFullscreen, contentDescription = "Exit fullscreen", tint = Primary)
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun PreviewLoadingOverlay(status: String) {
+private fun RepairStuckBanner(
+    onFixAgain: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(CardSurface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    tint = Primary
+                )
+                Text(
+                    text = "Still broken",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 10.dp)
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Dismiss",
+                        tint = MutedForeground
+                    )
+                }
+            }
+            Text(
+                text = "Auto-fix didn’t fully resolve it. Tap Fix again — AuraCode will retry.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedForeground,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            PrimaryButton(
+                text = "Fix again",
+                onClick = onFixAgain,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun AutoFixOverlay(status: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Background.copy(alpha = 0.92f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .padding(28.dp)
+                .background(CardSurface, RoundedCornerShape(18.dp))
+                .padding(horizontal = 22.dp, vertical = 20.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                tint = Primary,
+                modifier = Modifier.padding(bottom = 10.dp)
+            )
+            Text(
+                text = "Fixing automatically",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = status,
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedForeground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                text = "You can keep browsing — Preview will refresh when ready.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MutedForeground,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun PreviewQuietStatus(status: String) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = Primary)
+            Text(
+                text = "Building preview",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             Text(
                 text = status,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MutedForeground,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 16.dp, start = 24.dp, end = 24.dp)
+                modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp)
             )
         }
     }
@@ -112,23 +317,39 @@ private fun PreviewLoadingOverlay(status: String) {
 private fun BoxScope.PreviewContent(
     payloadJson: String,
     renderKey: Int,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onFullscreen: () -> Unit,
+    onRuntimeError: (String) -> Unit
 ) {
     key(renderKey) {
         SandpackWebView(
             payloadJson = payloadJson,
             renderKey = renderKey,
+            onRuntimeError = onRuntimeError,
             modifier = Modifier.fillMaxSize()
         )
     }
-    SmallFloatingActionButton(
-        onClick = onRefresh,
-        containerColor = Primary,
+    Column(
         modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(16.dp)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.End
     ) {
-        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh preview")
+        SmallFloatingActionButton(
+            onClick = onFullscreen,
+            containerColor = CardSurface,
+            contentColor = Primary,
+            modifier = Modifier.padding(bottom = 10.dp)
+        ) {
+            Icon(Icons.Outlined.Fullscreen, contentDescription = "Fullscreen")
+        }
+        SmallFloatingActionButton(
+            onClick = onRefresh,
+            containerColor = Primary,
+            contentColor = Color.Black
+        ) {
+            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh preview")
+        }
     }
 }
 
@@ -137,12 +358,14 @@ private fun BoxScope.PreviewContent(
 private fun SandpackWebView(
     payloadJson: String,
     renderKey: Int,
+    onRuntimeError: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bgColor = Background.toArgb()
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val nestedScroll = rememberNestedScrollInteropConnection()
     val rootView = LocalView.current
+    val errorHandler = remember(onRuntimeError) { onRuntimeError }
 
     LaunchedEffect(renderKey) {
         PreviewLog.i("SandpackWebView compose renderKey=$renderKey payloadChars=${payloadJson.length}")
@@ -185,8 +408,12 @@ private fun SandpackWebView(
                         val line = consoleMessage.lineNumber()
                         mainHandler.post {
                             when (consoleMessage.messageLevel()) {
-                                ConsoleMessage.MessageLevel.ERROR ->
+                                ConsoleMessage.MessageLevel.ERROR -> {
                                     PreviewLog.e("console[$level@$line] $msg")
+                                    if (PreviewViewModel.looksLikeAppError(msg)) {
+                                        errorHandler(msg)
+                                    }
+                                }
                                 ConsoleMessage.MessageLevel.WARNING ->
                                     PreviewLog.w("console[$level@$line] $msg")
                                 else ->
@@ -249,7 +476,10 @@ private fun SandpackWebView(
 
                     @JavascriptInterface
                     fun postError(message: String) {
-                        mainHandler.post { PreviewLog.e("js-error: $message") }
+                        mainHandler.post {
+                            PreviewLog.e("js-error: $message")
+                            errorHandler(message)
+                        }
                     }
 
                     @JavascriptInterface

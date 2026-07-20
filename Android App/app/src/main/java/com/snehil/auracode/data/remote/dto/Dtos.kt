@@ -2,6 +2,7 @@ package com.snehil.auracode.data.remote.dto
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class UserProfileDto(
@@ -119,15 +120,18 @@ data class PlanLimitsDto(
 @Serializable
 data class CheckoutRequest(
     val planId: Long,
-    val provider: String? = null,
+    val provider: String,
     val customerPhone: String? = null
 )
 
 @Serializable
 data class CheckoutResponse(
+    @JsonNames("checkout_url")
     val checkoutUrl: String? = null,
+    @JsonNames("payment_session_id")
     val paymentSessionId: String? = null,
     val provider: String? = null,
+    @JsonNames("cashfree_env")
     val cashfreeEnv: String? = null
 )
 
