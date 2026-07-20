@@ -16,6 +16,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Locale;
 
 /**
@@ -46,7 +48,10 @@ public class StripePlanPriceValidator implements ApplicationRunner {
         for (Plan plan : planRepository.findAll()) {
             if (!Boolean.TRUE.equals(plan.getActive())) continue;
             if (plan.getStripePriceId() == null || plan.getStripePriceId().isBlank()) {
-                // Cashfree-only plans are valid without a Stripe price id.
+                // Cashfree-only plans are valid without a Stripe price id — provision one for Stripe checkout.
+                if (stripeSecretKey.startsWith("sk_test_") && hasInrAmount(plan)) {
+                    provisionTestPrice(plan);
+                }
                 continue;
             }
             if (isPriceUsable(plan)) continue;
@@ -70,11 +75,18 @@ public class StripePlanPriceValidator implements ApplicationRunner {
         }
         try {
             Price price = Price.retrieve(priceId);
-            if (Boolean.TRUE.equals(price.getActive())) {
-                return true;
+            if (!Boolean.TRUE.equals(price.getActive())) {
+                log.warn("Stripe price {} for plan '{}' is archived", priceId, plan.getName());
+                return false;
             }
-            log.warn("Stripe price {} for plan '{}' is archived", priceId, plan.getName());
-            return false;
+            // TEST only: replace outdated $20 placeholders when plan has ₹ amount.
+            if (stripeSecretKey.startsWith("sk_test_") && hasInrAmount(plan)
+                    && !matchesInrAmount(price, plan.getAmountInr())) {
+                log.warn("Stripe price {} for plan '{}' is {} {} (expected INR {}) — will re-provision",
+                        priceId, plan.getName(), price.getCurrency(), price.getUnitAmount(), plan.getAmountInr());
+                return false;
+            }
+            return true;
         } catch (InvalidRequestException e) {
             if ("resource_missing".equals(e.getCode())) {
                 log.warn("Stripe price {} for plan '{}' does not exist in the connected Stripe account",
@@ -92,28 +104,42 @@ public class StripePlanPriceValidator implements ApplicationRunner {
 
     private void provisionTestPrice(Plan plan) {
         try {
+            long unitAmount = unitAmountFor(plan);
+            String currency = hasInrAmount(plan) ? "inr" : "usd";
             Product product = Product.create(ProductCreateParams.builder()
                     .setName(plan.getName().trim())
                     .build());
             Price price = Price.create(PriceCreateParams.builder()
                     .setProduct(product.getId())
-                    .setCurrency("usd")
-                    .setUnitAmount(placeholderAmountFor(plan))
+                    .setCurrency(currency)
+                    .setUnitAmount(unitAmount)
                     .setRecurring(PriceCreateParams.Recurring.builder()
                             .setInterval(PriceCreateParams.Recurring.Interval.MONTH)
                             .build())
                     .build());
             plan.setStripePriceId(price.getId());
             planRepository.save(plan);
-            log.warn("Auto-provisioned Stripe TEST price {} (${}/month placeholder) for plan '{}' — "
-                            + "adjust the amount in the Stripe dashboard if needed.",
-                    price.getId(), placeholderAmountFor(plan) / 100, plan.getName());
+            log.warn("Auto-provisioned Stripe TEST price {} ({} {}/month) for plan '{}'",
+                    price.getId(), currency.toUpperCase(Locale.ROOT), unitAmount / 100.0, plan.getName());
         } catch (StripeException e) {
             log.error("Failed to auto-provision a Stripe price for plan '{}'", plan.getName(), e);
         }
     }
 
-    private long placeholderAmountFor(Plan plan) {
+    private static boolean hasInrAmount(Plan plan) {
+        return plan.getAmountInr() != null && plan.getAmountInr().compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private static boolean matchesInrAmount(Price price, BigDecimal amountInr) {
+        if (price.getUnitAmount() == null || amountInr == null) return false;
+        long expectedPaise = amountInr.movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
+        return "inr".equalsIgnoreCase(price.getCurrency()) && price.getUnitAmount().equals(expectedPaise);
+    }
+
+    private static long unitAmountFor(Plan plan) {
+        if (hasInrAmount(plan)) {
+            return plan.getAmountInr().movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
+        }
         String name = plan.getName() == null ? "" : plan.getName().toLowerCase(Locale.ROOT);
         return name.contains("business") ? 5000L : 2000L;
     }

@@ -68,7 +68,7 @@ billing:
   default-plan:
     name: Pro
     stripe-price-id: ${STRIPE_DEFAULT_PRICE_ID:}
-    amount-inr: ${CASHFREE_DEFAULT_AMOUNT_INR:699}
+    amount-inr: ${CASHFREE_DEFAULT_AMOUNT_INR:600}
 
 # The Next.js frontend origin (dev server runs `next dev -p 5173`); Stripe/Cashfree
 # checkout redirects back to {client.url}/billing?status=... after payment.

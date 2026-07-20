@@ -45,7 +45,7 @@ function formatPlanPrice(
   }
   const num = parseFloat(price);
   if (isNaN(num) || num === 0) return { isFree: true, label: "Free" };
-  return { isFree: false, label: `$${num}` };
+  return { isFree: false, label: `₹${num}` };
 }
 
 export default function BillingPage() {
@@ -305,7 +305,6 @@ export default function BillingPage() {
               {plans.map((plan, index) => {
                 const isCurrent = subscription?.plan?.id === plan.id;
                 const { isFree, label: priceLabel } = formatPlanPrice(plan.price, plan.amountInr);
-                const hasCashfree = plan.amountInr != null && Number(plan.amountInr) > 0;
                 const nameLower = plan.name.toLowerCase();
                 const isPro = nameLower.includes("pro");
                 const isBusiness = nameLower.includes("business");
@@ -376,7 +375,7 @@ export default function BillingPage() {
                             <Button disabled className="w-full bg-zinc-800 text-zinc-500 border border-white/5 rounded-xl cursor-default text-xs h-10">Active Plan</Button>
                           ) : (
                             <>
-                              {!isFree && hasCashfree && (
+                              {!isFree && (
                                 <Button onClick={() => onCheckout(plan.id, "CASHFREE")} disabled={Boolean(checkoutLoadingKey)}
                                   className={`w-full text-xs font-bold h-10 rounded-xl transition-all duration-200 active:scale-[0.98] ${
                                     isFeatured
@@ -387,9 +386,9 @@ export default function BillingPage() {
                                 </Button>
                               )}
                               <Button onClick={() => onCheckout(plan.id, "STRIPE")} disabled={Boolean(checkoutLoadingKey)}
-                                variant={hasCashfree && !isFree ? "outline" : "default"}
+                                variant={!isFree ? "outline" : "default"}
                                 className={`w-full text-xs font-bold h-10 rounded-xl transition-all duration-200 active:scale-[0.98] ${
-                                  hasCashfree && !isFree
+                                  !isFree
                                     ? "border-white/10 bg-transparent text-zinc-300 hover:bg-zinc-800 hover:text-white"
                                     : isFeatured
                                       ? "bg-primary text-primary-foreground hover:bg-emerald-400 shadow-[0_4px_15px_rgba(34,197,94,0.25)]"

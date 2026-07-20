@@ -32,7 +32,7 @@ public class BillingPlansInitializer implements ApplicationRunner {
     @Value("${billing.default-plan.stripe-price-id:}")
     private String defaultStripePriceId;
 
-    @Value("${billing.default-plan.amount-inr:699}")
+    @Value("${billing.default-plan.amount-inr:600}")
     private BigDecimal defaultAmountInr;
 
     @Override
@@ -76,7 +76,7 @@ public class BillingPlansInitializer implements ApplicationRunner {
                 hasCashfree ? defaultAmountInr : null);
     }
 
-    /** Keep Cashfree INR amount aligned with env (e.g. 699) even if an older value was stored. */
+    /** Keep Cashfree INR amount aligned with env (e.g. 600) even if an older value was stored. */
     private void syncAmountInr() {
         for (Plan plan : planRepository.findAll()) {
             if (plan.getAmountInr() == null || plan.getAmountInr().compareTo(defaultAmountInr) != 0) {

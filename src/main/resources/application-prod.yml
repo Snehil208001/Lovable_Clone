@@ -74,7 +74,7 @@ billing:
   default-plan:
     name: Pro
     stripe-price-id: ${STRIPE_DEFAULT_PRICE_ID:}
-    amount-inr: ${CASHFREE_DEFAULT_AMOUNT_INR:699}
+    amount-inr: ${CASHFREE_DEFAULT_AMOUNT_INR:600}
 
 client:
   url: ${CLIENT_URL}

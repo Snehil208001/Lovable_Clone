@@ -133,7 +133,7 @@ fun BillingScreen(
                     }
 
                     Text(
-                        text = "Payments are processed securely by Stripe and Cashfree. Your plan updates automatically once payment completes.",
+                        text = "Payments are processed securely by Cashfree. Your plan updates automatically once payment completes.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -290,8 +290,9 @@ private fun PlanCard(
                 )
                 Text(
                     text = when {
-                        plan.amountInr != null && plan.amountInr > 0 -> "₹${plan.amountInr.toInt()}"
-                        !plan.price.isNullOrBlank() -> plan.price
+                        plan.amountInr != null && plan.amountInr > 0 ->
+                            "₹${plan.amountInr.toInt()}/mo"
+                        !plan.price.isNullOrBlank() -> "₹${plan.price}/mo"
                         else -> "—"
                     },
                     style = MaterialTheme.typography.titleMedium,
@@ -307,40 +308,20 @@ private fun PlanCard(
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(modifier.height(8.dp))
             PlanFeature("${plan.maxProjects} projects")
             PlanFeature(if (plan.unlimitedAi) "Unlimited AI tokens" else "${plan.maxTokensPerDay} tokens / day")
 
             val isFree = (plan.amountInr ?: 0.0) <= 0.0 && plan.price.isNullOrBlank()
-            val cashfreeEnabled = (plan.amountInr ?: 0.0) > 0.0
             if (!isCurrent && !isFree) {
-                Spacer(Modifier.height(14.dp))
+                Spacer(modifier.height(14.dp))
                 PrimaryButton(
-                    text = "Pay with card",
-                    onClick = { onCheckout(PaymentProvider.STRIPE) },
-                    loading = checkoutLoadingKey == "${PaymentProvider.STRIPE.apiValue}-${plan.id}",
+                    text = "Pay with Cashfree (UPI)",
+                    onClick = { onCheckout(PaymentProvider.CASHFREE) },
+                    loading = checkoutLoadingKey == "${PaymentProvider.CASHFREE.apiValue}-${plan.id}",
                     enabled = checkoutLoadingKey == null,
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (cashfreeEnabled) {
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { onCheckout(PaymentProvider.CASHFREE) },
-                        enabled = checkoutLoadingKey == null,
-                        border = BorderStroke(1.dp, BorderColor),
-                        modifier = Modifier.fillMaxWidth().height(46.dp)
-                    ) {
-                        if (checkoutLoadingKey == "${PaymentProvider.CASHFREE.apiValue}-${plan.id}") {
-                            CircularProgressIndicator(
-                                color = Primary,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        } else {
-                            Text("Pay via UPI / Cashfree", color = MaterialTheme.colorScheme.onSurface)
-                        }
-                    }
-                }
             }
         }
     }
