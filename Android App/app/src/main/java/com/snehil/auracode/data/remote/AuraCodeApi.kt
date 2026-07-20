@@ -83,6 +83,12 @@ interface AuraCodeApi {
         @Body body: CheckoutRequest
     ): CheckoutResponse
 
+    /** Dedicated Cashfree path — avoids Stripe fallback when provider routing fails on the server. */
+    @POST("api/payments/cashfree/checkout")
+    suspend fun createCashfreeCheckout(
+        @Body body: CheckoutRequest
+    ): CheckoutResponse
+
     @POST("api/payments/portal")
     suspend fun openPortal(): PortalResponse
 }

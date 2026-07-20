@@ -32,7 +32,12 @@ jobs:
 
       - name: Docker build backend
         run: |
-          docker build -f Dockerfile.backend -t ${{ secrets.ACR_LOGIN_SERVER }}/backend:${{ github.sha }} -t ${{ secrets.ACR_LOGIN_SERVER }}/backend:latest .
+          # --no-cache ensures billing/Cashfree Java changes are never served from a stale layer
+          docker build --no-cache \
+            --build-arg GIT_SHA=${{ github.sha }} \
+            -f Dockerfile.backend \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/backend:${{ github.sha }} \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/backend:latest .
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/backend:${{ github.sha }}
           docker push ${{ secrets.ACR_LOGIN_SERVER }}/backend:latest
 
@@ -50,5 +55,11 @@ jobs:
         uses: azure/CLI@v2
         with:
           inlineScript: |
-            az containerapp update -g ${{ secrets.RESOURCE_GROUP }} -n ${{ secrets.BACKEND_APP }} --image ${{ secrets.ACR_LOGIN_SERVER }}/backend:${{ github.sha }}
-            az containerapp update -g ${{ secrets.RESOURCE_GROUP }} -n ${{ secrets.FRONTEND_APP }} --image ${{ secrets.ACR_LOGIN_SERVER }}/frontend:${{ github.sha }}
+            SHORT_SHA="${GITHUB_SHA:0:8}"
+            az containerapp update -g ${{ secrets.RESOURCE_GROUP }} -n ${{ secrets.BACKEND_APP }} \
+              --image ${{ secrets.ACR_LOGIN_SERVER }}/backend:${{ github.sha }} \
+              --revision-suffix "g${SHORT_SHA}" \
+              --set-env-vars "APP_GIT_SHA=${{ github.sha }}"
+            az containerapp update -g ${{ secrets.RESOURCE_GROUP }} -n ${{ secrets.FRONTEND_APP }} \
+              --image ${{ secrets.ACR_LOGIN_SERVER }}/frontend:${{ github.sha }} \
+              --revision-suffix "g${SHORT_SHA}"

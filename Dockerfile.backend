@@ -13,6 +13,8 @@ RUN mvn -B -DskipTests package \
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 
+ARG GIT_SHA=unknown
+
 RUN addgroup -S app && adduser -S app -G app \
     && chown -R app:app /app
 
@@ -22,6 +24,7 @@ COPY --from=build --chown=app:app /app/app.jar /app/app.jar
 
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV PORT=8080
+ENV APP_GIT_SHA=${GIT_SHA}
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]

@@ -151,7 +151,13 @@ export const ApiClient = {
   // Billing / Plans
   getAllPlans: async () => api.get<PlanResponse[]>("/api/plans"),
   getMySubscription: async () => api.get<SubscriptionResponse>("/api/me/subscription"),
-  createCheckoutSession: async (data: CheckoutRequest) => api.post<CheckoutResponse>("/api/payments/checkout", data),
+  createCheckoutSession: async (data: CheckoutRequest) => {
+    const path =
+      data.provider === "CASHFREE"
+        ? "/api/payments/cashfree/checkout"
+        : "/api/payments/checkout";
+    return api.post<CheckoutResponse>(path, data);
+  },
   openCustomerPortal: async () => api.post<PostalResponse>("/api/payments/portal"),
 
   // Usage

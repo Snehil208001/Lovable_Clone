@@ -1,5 +1,8 @@
 package com.snehil.project.lovable_clone.dto.subscriptions;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record CheckoutResponse(
         String checkoutUrl,
         String paymentSessionId,

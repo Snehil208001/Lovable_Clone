@@ -49,10 +49,12 @@ class BillingRepositoryImpl @Inject constructor(
 
     override suspend fun createCheckout(planId: Long, provider: String): Resource<CheckoutSession> =
         when (val res = apiCall {
-            api.createCheckout(
-                provider = provider,
-                body = CheckoutRequest(planId = planId, provider = provider)
-            )
+            val body = CheckoutRequest(planId = planId, provider = provider)
+            if (provider.equals("CASHFREE", ignoreCase = true)) {
+                api.createCashfreeCheckout(body)
+            } else {
+                api.createCheckout(provider = provider, body = body)
+            }
         }) {
             is Resource.Success -> Resource.Success(res.data.toDomain())
             is Resource.Error -> res

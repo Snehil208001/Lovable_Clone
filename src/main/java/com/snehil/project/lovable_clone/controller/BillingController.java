@@ -49,6 +49,19 @@ public class BillingController {
         return ResponseEntity.ok(subscriptionService.getCurrentSubscription());
     }
 
+    /**
+     * Cashfree-only checkout. Prefer this from Android/web for UPI — avoids provider
+     * routing bugs where a Stripe session was returned for CASHFREE requests.
+     */
+    @PostMapping("/api/payments/cashfree/checkout")
+    public ResponseEntity<CheckoutResponse> createCashfreeCheckout(
+            @RequestBody CheckoutRequest request,
+            @AuthenticationPrincipal JwtUserPrincipal currentUser
+    ) {
+        log.info("Cashfree checkout planId={} userId={}", request.planId(), currentUser.userId());
+        return ResponseEntity.ok(cashfreePaymentService.createCheckoutSession(request, currentUser.userId()));
+    }
+
     @PostMapping("/api/payments/checkout")
     public ResponseEntity<CheckoutResponse> createCheckoutResponse(
             @RequestBody CheckoutRequest request,
