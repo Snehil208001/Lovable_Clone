@@ -57,14 +57,28 @@ public class BillingController {
     ) {
         String fromBody = request.provider();
         String fromQuery = providerParam;
-        String provider = StringUtils.hasText(fromBody)
-                ? fromBody.trim().toUpperCase()
-                : (StringUtils.hasText(fromQuery) ? fromQuery.trim().toUpperCase() : "STRIPE");
-        log.info("Checkout requested provider={} planId={} userId={}", provider, request.planId(), currentUser.userId());
+        // Prefer an explicit CASHFREE from either source — never let a missing/defaulted
+        // body field hide a Cashfree query param (Android sends both).
+        String provider;
+        if ("CASHFREE".equalsIgnoreCase(safe(fromBody)) || "CASHFREE".equalsIgnoreCase(safe(fromQuery))) {
+            provider = "CASHFREE";
+        } else if (StringUtils.hasText(fromBody)) {
+            provider = fromBody.trim().toUpperCase();
+        } else if (StringUtils.hasText(fromQuery)) {
+            provider = fromQuery.trim().toUpperCase();
+        } else {
+            provider = "STRIPE";
+        }
+        log.info("Checkout requested provider={} planId={} userId={} (body={}, query={})",
+                provider, request.planId(), currentUser.userId(), fromBody, fromQuery);
         if ("CASHFREE".equals(provider)) {
             return ResponseEntity.ok(cashfreePaymentService.createCheckoutSession(request, currentUser.userId()));
         }
         return ResponseEntity.ok(paymentProcessor.createCheckoutSessionUrl(request, currentUser.userId()));
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 
     @PostMapping("/api/payments/portal")
