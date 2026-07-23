@@ -52,28 +52,28 @@ The Android client is architected following Google’s recommended **Clean Archi
 ```mermaid
 graph TD
     subgraph UI ["Presentation Layer (Jetpack Compose & ViewModels)"]
-        UI_Screen["Compose UI Screens\n(Dashboard, Chat, Code, Preview, Billing)"]
-        VM["ViewModels\n(DashboardVM, ChatVM, CodeVM, PreviewVM)"]
-        UI_State["StateFlow / SharedFlow\n(UI State & One-off Events)"]
-        UI_Screen <-->|Binds & Observes| VM
+        UI_Screen["Compose UI Screens<br/>(Dashboard, Chat, Code, Preview, Billing)"]
+        VM["ViewModels<br/>(DashboardVM, ChatVM, CodeVM, PreviewVM)"]
+        UI_State["StateFlow / SharedFlow<br/>(UI State & One-off Events)"]
+        UI_Screen <--> VM
         VM --> UI_State
     end
 
     subgraph Domain ["Domain Layer (Business Logic)"]
-        UC["Use Cases\n(AuthUseCases, ProjectUseCases, WorkspaceUseCases, BillingUseCases)"]
-        RepoInterfaces["Repository Interfaces\n(AuthRepository, ProjectRepository, etc.)"]
+        UC["Use Cases<br/>(AuthUseCases, ProjectUseCases, WorkspaceUseCases, BillingUseCases)"]
+        RepoInterfaces["Repository Interfaces<br/>(AuthRepository, ProjectRepository, etc.)"]
         VM --> UC
         UC --> RepoInterfaces
     end
 
     subgraph Data ["Data Layer (Repositories & Data Sources)"]
-        RepoImpl["Repository Implementations\n(AuthRepositoryImpl, ProjectRepositoryImpl, etc.)"]
-        DataStore["Jetpack DataStore\n(TokenDataStore - Encrypted JWT)"]
-        Retrofit["Retrofit API Client\n(AuthInterceptor + AuthEventBus)"]
-        SSE["ChatStreamClient\n(Server-Sent Events Reader)"]
-        Sandpack["SandpackBuilder & InteractiveWebView\n(Client-side JS Compiler)"]
+        RepoImpl["Repository Implementations<br/>(AuthRepositoryImpl, ProjectRepositoryImpl, etc.)"]
+        DataStore["Jetpack DataStore<br/>(TokenDataStore - Encrypted JWT)"]
+        Retrofit["Retrofit API Client<br/>(AuthInterceptor + AuthEventBus)"]
+        SSE["ChatStreamClient<br/>(Server-Sent Events Reader)"]
+        Sandpack["SandpackBuilder & InteractiveWebView<br/>(Client-side JS Compiler)"]
         
-        RepoInterfaces <..|Implements| RepoImpl
+        RepoImpl -.->|Implements| RepoInterfaces
         RepoImpl --> DataStore
         RepoImpl --> Retrofit
         RepoImpl --> SSE
