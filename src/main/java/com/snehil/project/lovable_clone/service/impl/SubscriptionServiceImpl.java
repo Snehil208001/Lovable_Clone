@@ -40,13 +40,14 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public SubscriptionResponse getCurrentSubscription() {
         Long userId = authUtil.getCurrentUserId();
 
-        var currentSubscription = subscriptionRepository.findByUserIdAndStatusIn(userId, Set.of(
-                SubscriptionStatus.ACTIVE,SubscriptionStatus.PAST_DUE,
+        // Free tier: no row → null plan/status. Do NOT map an empty Subscription entity;
+        // MapStruct calls status.name() and NPEs into a generic 500.
+        return subscriptionRepository.findByUserIdAndStatusIn(userId, Set.of(
+                SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE,
                 SubscriptionStatus.TRAILING
-        )).orElse(
-                new Subscription()
-        );
-        return subscriptionMapper.toSubscriptionResponse(currentSubscription);
+        ))
+                .map(subscriptionMapper::toSubscriptionResponse)
+                .orElse(new SubscriptionResponse(null, null, null, null));
     }
 
     @Override

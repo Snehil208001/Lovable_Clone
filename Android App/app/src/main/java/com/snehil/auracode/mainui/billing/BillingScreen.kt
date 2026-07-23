@@ -308,13 +308,13 @@ private fun PlanCard(
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
-            Spacer(modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
             PlanFeature("${plan.maxProjects} projects")
             PlanFeature(if (plan.unlimitedAi) "Unlimited AI tokens" else "${plan.maxTokensPerDay} tokens / day")
 
             val isFree = (plan.amountInr ?: 0.0) <= 0.0 && plan.price.isNullOrBlank()
             if (!isCurrent && !isFree) {
-                Spacer(modifier.height(14.dp))
+                Spacer(Modifier.height(14.dp))
                 PrimaryButton(
                     text = "Pay with Cashfree (UPI)",
                     onClick = { onCheckout(PaymentProvider.CASHFREE) },

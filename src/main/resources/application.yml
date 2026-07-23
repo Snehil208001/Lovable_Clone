@@ -58,8 +58,8 @@ stripe:
 cashfree:
   app-id: ${CASHFREE_APP_ID:}
   secret-key: ${CASHFREE_SECRET_KEY:}
-  # SANDBOX or PRODUCTION
-  env: ${CASHFREE_ENV:PRODUCTION}
+  # SANDBOX (Test Environment) or PRODUCTION — must match dashboard keys
+  env: ${CASHFREE_ENV:SANDBOX}
   # Optional public webhook URL (also configure in Cashfree Dashboard → Webhooks)
   notify-url: ${CASHFREE_NOTIFY_URL:}
 

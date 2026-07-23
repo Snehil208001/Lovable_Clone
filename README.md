@@ -1,18 +1,19 @@
-# 🚀 Lovable Clone — Full-Stack AI App Generator
+# 🚀 AuraCode — Full-Stack & Native Android AI App Generator
 
 <div align="center">
-  <img src="docs/assets/logo.png" alt="AuraCode Common Logo" width="160" style="border-radius: 20px; margin-bottom: 16px;" />
+  <img src="docs/assets/logo.png" alt="AuraCode Logo" width="160" style="border-radius: 20px; margin-bottom: 16px;" />
 
   <p align="center">
-    <b>A powerful, full-stack AI-powered application generation platform inspired by <a href="https://lovable.dev">Lovable</a>.</b><br />
-    Build, preview, and deploy full-stack applications instantly using natural language prompts.
+    <b>A powerful, full-stack AI-powered application generation platform featuring a native Android mobile application & Next.js web application.</b><br />
+    Build, preview, and interact with generated full-stack applications instantly using natural language prompts on mobile and web.
   </p>
 
   <p align="center">
+    <img src="https://img.shields.io/badge/Android-Kotlin_/_Compose-3DDC84?style=for-the-badge&logo=android" alt="Android Kotlin Compose" />
+    <img src="https://img.shields.io/badge/Architecture-Clean_/_MVVM-blue?style=for-the-badge&logo=android" alt="Clean MVVM Architecture" />
     <img src="https://img.shields.io/badge/Java-21-orange?style=for-the-badge&logo=openjdk" alt="Java 21" />
     <img src="https://img.shields.io/badge/Spring_Boot-4.0-brightgreen?style=for-the-badge&logo=springboot" alt="Spring Boot 4.0" />
     <img src="https://img.shields.io/badge/Next.js-15-blue?style=for-the-badge&logo=nextdotjs" alt="Next.js 15" />
-    <img src="https://img.shields.io/badge/Android-Kotlin_/_Compose-3DDC84?style=for-the-badge&logo=android" alt="Android Kotlin Compose" />
     <img src="https://img.shields.io/badge/PostgreSQL-18-blue?style=for-the-badge&logo=postgresql" alt="PostgreSQL" />
     <img src="https://img.shields.io/badge/Docker-Supported-blue?style=for-the-badge&logo=docker" alt="Docker" />
   </p>
@@ -20,33 +21,122 @@
 
 ---
 
-## ✨ Features
+## 📱 Native Android Mobile App (Recruiter Showcase)
 
-### 💻 Modern Frontend
-- **🤖 Interactive AI Workspace**: Dynamic chat interface with real-time SSE streaming for instant code generation.
-- **⚡ Live Sandpack Preview**: Real-time app preview and inline code editing powered by CodeSandbox Sandpack.
-- **📊 Premium Dashboard**: Clean, modern dark-mode dashboard to organize and manage all your AI-generated projects.
-- **💳 Stripe Subscription & Billing**: Complete subscription lifecycle management with Stripe Checkout, Webhooks, and Plan Comparisons.
-- **👥 Real-Time Collaboration**: Invite team members, configure RBAC roles (Owner/Editor/Viewer), and build together.
-- **🎨 Elite Dark Theme UI**: Sleek, high-fidelity dark-mode interface built with Tailwind CSS, Framer Motion, and Radix/Shadcn UI.
+The **AuraCode Android Client** is a feature-rich, production-grade native Android app built using **Kotlin**, **Jetpack Compose**, and **Clean Architecture + MVVM**. It allows users to write prompts, stream AI code generation in real-time, view dynamic project file trees, compile React/HTML templates on-device in an interactive WebView, and manage subscriptions.
 
-### 📱 Native Android Mobile App
-- **🎨 Sleek Compose UI**: Modern, fluid Jetpack Compose user interface matching the high-fidelity dark-mode web dashboard.
-- **🤖 Mobile Prompting Workspace**: Direct integration with Spring AI/SSE backend for streaming chat and code generation on-the-go.
-- **⚡ In-App Web Preview Sandbox**: Run React, Next.js, and HTML templates directly on device utilizing a client-side Sandpack rendering engine inside custom interactive WebViews.
-- **📂 Workspace Code & Files View**: Browse and explore full project file hierarchies dynamically from your mobile phone.
-- **💳 Native Billing Checkout**: Complete subscription management and upgrade flows via customized Stripe checkout web interfaces.
+<div align="center">
+  <img src="docs/assets/android-preview.png" alt="AuraCode Android App Preview" width="340" style="border-radius: 20px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
+  <p><i>Native Jetpack Compose UI: Dashboard, Code Explorer, Real-time SSE Chat & On-Device Sandpack Web Preview</i></p>
+</div>
 
-### ⚙️ Robust Backend
-- **☕ Spring Boot 4 REST API**: High-throughput RestControllers built with Java 21 and Spring Web.
-- **🧠 Spring AI Integration**: Native integration with OpenAI GPT models for smart code generation.
-- **🔒 Stateful & Stateless Security**: JWT-based session filters and method-level access control (@EnableMethodSecurity).
-- **📂 MinIO Hybrid File Storage**: High-performance object storage for project file trees with a PostgreSQL database fallback.
+---
 
+### ⚡ Recruiter Fast-Track (APK & Demo Credentials)
+
+Recruiters can immediately install and test the live application on an Android device or emulator without setting up the environment:
+
+| Resource | Access Link / Details |
+| :--- | :--- |
+| **📥 Direct APK Download** | [**`auracode-android-client.apk`**](apk/auracode-android-client.apk) *(Pre-compiled & ready to install)* |
+| **🔑 Demo Account Email** | `snehil@gmail.com` |
+| **🔐 Demo Password** | `Snehil@123` |
+| **🌐 Cloud Backend Target** | Live Azure API: `https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io` |
+
+---
+
+### 🏛️ Android Architecture & Engineering Deep Dive
+
+The Android client is architected following Google’s recommended **Clean Architecture** combined with the **MVVM (Model-View-ViewModel)** design pattern. It enforces strict layer isolation, unidirectional data flow, and modularity.
+
+```mermaid
+graph TD
+    subgraph UI ["Presentation Layer (Jetpack Compose & ViewModels)"]
+        UI_Screen["Compose UI Screens\n(Dashboard, Chat, Code, Preview, Billing)"]
+        VM["ViewModels\n(DashboardVM, ChatVM, CodeVM, PreviewVM)"]
+        UI_State["StateFlow / SharedFlow\n(UI State & One-off Events)"]
+        UI_Screen <-->|Binds & Observes| VM
+        VM --> UI_State
+    end
+
+    subgraph Domain ["Domain Layer (Business Logic)"]
+        UC["Use Cases\n(AuthUseCases, ProjectUseCases, WorkspaceUseCases, BillingUseCases)"]
+        RepoInterfaces["Repository Interfaces\n(AuthRepository, ProjectRepository, etc.)"]
+        VM --> UC
+        UC --> RepoInterfaces
+    end
+
+    subgraph Data ["Data Layer (Repositories & Data Sources)"]
+        RepoImpl["Repository Implementations\n(AuthRepositoryImpl, ProjectRepositoryImpl, etc.)"]
+        DataStore["Jetpack DataStore\n(TokenDataStore - Encrypted JWT)"]
+        Retrofit["Retrofit API Client\n(AuthInterceptor + AuthEventBus)"]
+        SSE["ChatStreamClient\n(Server-Sent Events Reader)"]
+        Sandpack["SandpackBuilder & InteractiveWebView\n(Client-side JS Compiler)"]
+        
+        RepoInterfaces <..|Implements| RepoImpl
+        RepoImpl --> DataStore
+        RepoImpl --> Retrofit
+        RepoImpl --> SSE
+        RepoImpl --> Sandpack
+    end
+```
+
+#### 🔑 Key Architectural Components:
+
+1. **Clean Architecture Layering**:
+   - **`domain`**: Contains pure Kotlin entities (`Project`, `User`, `StreamEvent`), abstract repository interfaces, and use-cases (`AuthUseCases`, `WorkspaceUseCases`). Has zero dependencies on Android SDK or external libraries.
+   - **`data`**: Responsible for network communication, local storage, DTO parsing, and repository implementations (`ProjectRepositoryImpl`, `AuthRepositoryImpl`).
+   - **`mainui` & `ui`**: Presentation layer featuring Jetpack Compose screens (`DashboardScreen`, `WorkspaceScreen`, `ChatScreen`, `CodeScreen`, `PreviewScreen`) and stateful ViewModels.
+
+2. **UI Layer (Jetpack Compose & Material 3)**:
+   - **Declarative UI**: Built entirely with Jetpack Compose using dynamic dark-mode styling, glassmorphism card layouts, and custom theme system (`Color.kt`, `Theme.kt`, `Type.kt`).
+   - **Unidirectional Data Flow (UDF)**: ViewModels expose immutable `StateFlow` streams. Screens consume UI state safely with `collectAsStateWithLifecycle()`.
+
+3. **Dependency Injection (Dagger Hilt)**:
+   - Centralized dependency graphs configured via `@HiltAndroidApp` and modules (`NetworkModule.kt`, `RepositoryModule.kt`).
+   - Standardizes ViewModel lifecycle binding (`@HiltViewModel`) and interface implementations.
+
+4. **Reactive & Asynchronous Concurrency**:
+   - **Kotlin Coroutines & Flow**: Offloads network and I/O tasks from the Main Looper thread to `Dispatchers.IO`.
+   - **StateFlow & SharedFlow**: Handles persistent state updates (e.g. file trees, chat logs) and one-time UI events (e.g. snackbar alerts, navigation redirects).
+
+5. **Networking & Auth Security**:
+   - **Retrofit 2 & OkHttp 4**: Standardized REST client handling all backend API communications (`AuraCodeApi.kt`).
+   - **`AuthInterceptor`**: Automatically injects JWT Bearer tokens retrieved from `TokenDataStore` into HTTP headers.
+   - **`AuthEventBus`**: Reactive channel catching 401 Unauthorized responses to seamlessly trigger app-wide logout and user re-authentication.
+
+6. **Real-Time Streaming Engine (SSE)**:
+   - **`ChatStreamClient`**: Implements custom OkHttp EventSource parsing to stream Server-Sent Events (SSE) from Spring AI (`/api/chat/stream`).
+   - Parses streaming JSON chunks on-the-fly and updates file tree structures incrementally in memory.
+
+7. **On-Device Sandpack Web Rendering Engine**:
+   - **`SandpackBuilder` & `InteractiveWebView`**: Synthesizes generated React/Next.js files into an executable HTML/JS payload and executes it inside a customized Android `WebView`.
+   - **`PreviewErrorAnalyzer` & `PreviewRepairBus`**: Captures client-side JavaScript console errors from the WebView and emits repair prompts back to the AI for auto-debugging.
+
+8. **Secure Token Storage**:
+   - **`TokenDataStore`**: Built on Android **Jetpack DataStore** to store JWT tokens and user profile preferences securely.
+
+---
+
+## ✨ Full-Stack Platform Features
+
+### 💻 Modern Web Frontend (Next.js 15)
+- **🤖 Interactive AI Workspace**: Real-time SSE streaming for multi-file app code generation.
+- **⚡ Live Sandpack Preview**: Sandpack compilation with live side-by-side preview and code editor.
+- **📊 Dark Theme Dashboard**: Dark-mode project dashboard with real-time preview usage tracking.
+- **💳 Stripe Subscription & Billing**: Webhook integration for automated plan upgrades and token quota resets.
+
+### ⚙️ Robust Spring Boot 4 Backend
+- **☕ High-Throughput REST API**: Java 21 REST controllers with Spring Web and Security.
+- **🧠 Spring AI Integration**: Direct integration with OpenAI GPT models and SSE streaming (`AiGenerationService`).
+- **🔒 Security & RBAC**: Method-level security annotations (`@security.canViewProject`) with JWT filters.
+- **📂 MinIO Hybrid File Storage**: Object storage persistence for multi-file project structures with PostgreSQL fallback.
+
+---
 
 ## 🌐 Production Environment (Live Deployment)
 
-The platform is deployed and running live on Azure Container Apps with the following endpoints:
+The platform is deployed live on **Azure Container Apps**:
 
 * **Frontend Web Application**: [https://auracode-web.whitemeadow-09bf00ac.centralus.azurecontainerapps.io](https://auracode-web.whitemeadow-09bf00ac.centralus.azurecontainerapps.io)
 * **Backend API Gateway**: [https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io](https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io)
@@ -58,239 +148,76 @@ The platform is deployed and running live on Azure Container Apps with the follo
 ## 📸 Production Gallery
 
 ### 1. Interactive Prompt Execution (Live Walkthrough)
-The recorded demonstration below displays streaming AI code generation, automatic MinIO bucket writing, and instant live Sandpack compilation:
-
 <div align="center">
   <img src="docs/assets/run-prompt-flow.webp" alt="AuraCode Live Prompt Walkthrough" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
 </div>
 
-### 2. Premium Pro Dashboard (Upgraded via Stripe Webhook)
-After a successful test subscription checkout via Stripe, our live Webhook endpoint processes the payload and upgrades the dashboard layout, introducing expanded token and active preview limits:
-
+### 2. Premium Pro Dashboard
 <div align="center">
   <img src="docs/assets/dashboard-pro.png" alt="AuraCode Pro Dashboard" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
 </div>
 
 ### 3. Glassmorphic Calculator Workspace
-The code editor and live preview panel compiling a premium glassmorphic Scientific Calculator generated directly by the platform's AI:
-
 <div align="center">
   <img src="docs/assets/workspace-todo.png" alt="Scientific Calculator Workspace" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
 </div>
 
 ---
 
-## 📸 Application Demo
-
-The animation above showcases the user flow end-to-end:
-1. **Seamless Sign Up & Login** (JWT authentication).
-2. **Dashboard Project Creation** (metadata persistence & project seeding).
-3. **Workspace File Tree & Code Editor** (exploring files, real-time code preview).
-4. **Subscription Plan Upgrades** (Stripe-ready pricing layout).
-
----
-
 ## 📋 API Route Reference
 
-The backend runs on `http://localhost:8080` by default.
+Backend running on `http://localhost:8080` (or Azure production endpoint):
 
 | Category | Endpoint | Method | Description |
 | :--- | :--- | :--- | :--- |
 | **Auth** | `/api/auth/login` | `POST` | Authenticate user & return JWT token |
 | **Auth** | `/api/auth/signup` | `POST` | Create a new user account |
-| **Projects**| `/api/projects` | `GET/POST` | List all user projects / Create a new project |
+| **Projects**| `/api/projects` | `GET/POST` | List user projects / Create project |
 | **Projects**| `/api/projects/{id}` | `GET/DELETE` | Retrieve project details / Delete project |
 | **Members** | `/api/projects/{id}/members` | `GET/POST` | List members / Invite member to project |
 | **Files** | `/api/projects/{id}/files` | `GET/PUT` | Retrieve file tree / Update file contents |
 | **Chat** | `/api/chat/stream` | `GET` | SSE endpoint for streaming AI code generation |
-| **Billing** | `/api/payments/checkout` | `POST` | Create Stripe Checkout Session |
-| **Usage** | `/api/usage/today` | `GET` | Retrieve daily token and preview slots usage |
+| **Billing** | `/api/payments/checkout` | `POST` | Create Stripe / Cashfree Checkout Session |
+| **Usage** | `/api/usage/today` | `GET` | Retrieve daily token and preview slot quotas |
 
 ---
 
-## 🛠️ System Architecture & Implementation
-
-Here is a deep dive into the engineering behind Lovable Clone:
-
-### 1. Security & RBAC Guardrails (`security/`)
-- Enforces strict role-based access control (RBAC). For example, a user must be a project member to see or edit its files.
-- Uses `@security.canViewProject(#id)` and `@security.canEditProject(#id)` inside method security annotations.
-- Implements custom `JwtAuthFilter` that properly registers the auth principal during async requests (like Server-Sent Events chat stream).
-
-### 2. Streamlined AI Code Generation (`llm/`, `service/`)
-- Integrates **Spring AI** to construct multi-file code responses.
-- Implements **LlmResponseParser** to parse LLM outputs into structured project files in real-time.
-- Supports streaming of file updates over Server-Sent Events (SSE).
-
-### 3. Subscription & Usage Limits (`stripe/`, `service/`)
-- Automatically seeds default billing plans into the PostgreSQL database at startup via `BillingPlansInitializer`.
-- Monitors daily tokens and active preview usage slots, preventing abuse on free tiers.
-
----
-
-## 🚀 Getting Started
+## 🚀 Local Development Setup
 
 ### Prerequisites
-- **Java 21** & Maven
+- **Android Studio Ladybug / Jellyfish** (with Kotlin 2.0+)
+- **Java 21** & Maven 3.9+
 - **Node.js 20+**
 - **Docker & Docker Compose**
-- **OpenAI API Key** (for code generation)
 
-### 1. Launch Infrastructure
-Start PostgreSQL (with pgvector support) and MinIO services:
+### 1. Running the Android Application
+1. Open the [`Android App`](Android%20App) folder in Android Studio.
+2. The app connects to the live Azure backend by default (`https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io`).
+3. To switch to a local backend instance, edit `API_BASE_URL` in [`Android App/app/build.gradle.kts`](Android%20App/app/build.gradle.kts):
+   ```kotlin
+   buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"") // 10.0.2.2 is Android Emulator localhost
+   ```
+4. Sync Gradle and press **Run** (or execute `./gradlew assembleDebug` to build the APK).
+
+### 2. Running Backend Infrastructure
 ```bash
+# Launch Postgres & MinIO
 docker compose -f services.docker-compose.yml up -d
+
+# Start Spring Boot Backend
+$env:DB_PASSWORD="password"; $env:OPENAI_API_KEY="your-key"; $env:SPRING_PROFILES_ACTIVE="local"; .\mvnw.cmd spring-boot:run
 ```
 
-### 2. Backend Setup
-Create your local configuration profile. Copy the template and add your API keys:
-```bash
-cp application-local.yml.example src/main/resources/application-local.yml
-```
-Run the Spring Boot application (using local profile with timezone override to prevent PG timezone conflicts):
-```bash
-$env:DB_PASSWORD="password"; $env:OPENAI_API_KEY="your-openai-key"; $env:SPRING_PROFILES_ACTIVE="local"; $env:MAVEN_OPTS="-Duser.timezone=UTC"; .\mvnw.cmd spring-boot:run
-```
-
-### 3. Frontend Setup
-Navigate to the frontend directory, install dependencies, and launch the Next.js development server:
+### 3. Running Frontend Web App
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Visit the app at **`http://localhost:5173`**.
-
-### 4. Android App Setup
-Open the [`Android App`](file:///c:/Lovable%20Git/Android%20App) folder in Android Studio.
-The application connects automatically to the live deployed Azure backend by default (`https://auracode-api.whitemeadow-09bf00ac.centralus.azurecontainerapps.io`).
-If you want to configure it to point to a local instance of the backend:
-- Update `API_BASE_URL` inside [`Android App/app/build.gradle.kts`](file:///c:/Lovable%20Git/Android%20App/app/build.gradle.kts):
-```kotlin
-buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080\"") // 10.0.2.2 is the localhost gateway for the Android Emulator
-```
-Build and run on your emulator or physical Android device.
-
----
-
-## ☁️ Production on Azure (Container Apps)
-
-**Primary cloud target.** Stack: **Azure Container Apps** (API + Next.js + MinIO) · **Azure Database for PostgreSQL** · **Key Vault** · **Azure Container Registry** · GitHub Actions.
-
-```text
-User → Container App (frontend) → Container App (backend) → Azure Postgres
-                                   → Container App (MinIO / S3 API)
-                                   → Key Vault / OpenAI / Stripe
-```
-
-> GCP scripts under [`deploy/gcp/`](deploy/gcp/) and [`cloudbuild.yaml`](cloudbuild.yaml) remain as an optional alternate; Azure is the documented path going forward.
-
-### Required environment variables
-
-| Variable | Where | Purpose |
-|---|---|---|
-| `SPRING_PROFILES_ACTIVE=prod` | Backend | Loads `application-prod.yml` |
-| `SPRING_DATASOURCE_URL` | Backend | Azure Postgres JDBC URL (`?sslmode=require`) |
-| `DB_USER` / `DB_PASSWORD` | Backend | Database credentials (Key Vault) |
-| `JWT_SECRET_KEY` | Backend | JWT HMAC secret (**32+ random bytes**; never commit) |
-| `OPENAI_API_KEY` | Backend | Spring AI / generation |
-| `STRIPE_API_KEY` / `STRIPE_WEBHOOK_SECRET` | Backend | Billing |
-| `CLIENT_URL` / `CORS_ALLOWED_ORIGINS` | Backend | Frontend origin |
-| `MINIO_URL` | Backend | MinIO Container App HTTPS URL |
-| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | Backend | MinIO root credentials |
-| `MINIO_PROJECT_BUCKET` | Backend | Bucket name for project files |
-| `NEXT_PUBLIC_API_BASE_URL` | Frontend **build arg** | Absolute API URL (SSE + REST) |
-| `PORT` | Both | `8080` |
-
-Azure Postgres JDBC example:
-
-```text
-jdbc:postgresql://auracode-pg.postgres.database.azure.com:5432/auracode?sslmode=require
-```
-
-**Stripe webhook:** `https://<backend-fqdn>/webhooks/payment`  
-**Health:** `https://<backend-fqdn>/actuator/health`
-
-### Deploy with Azure CLI (recommended)
-
-1. Install [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) and run `az login`.
-2. Copy and fill config:
-
-```bash
-cp deploy/azure/config.env.example deploy/azure/config.env
-# SUBSCRIPTION_ID, LOCATION, ACR_NAME, KEY_VAULT_NAME, DB_PASSWORD,
-# JWT_SECRET_KEY, OPENAI_API_KEY, MINIO_SECRET_KEY, STRIPE_*, etc.
-```
-
-3. Bootstrap infrastructure, then apps (Git Bash / WSL / Azure Cloud Shell):
-
-```bash
-bash deploy/azure/bootstrap.sh
-bash deploy/azure/06-deploy-minio.sh
-bash deploy/azure/07-deploy-backend.sh      # FRONTEND_URL may be temporary
-bash deploy/azure/08-deploy-frontend.sh
-# FRONTEND_URL is written to config.env — re-run backend for CORS:
-bash deploy/azure/07-deploy-backend.sh
-```
-
-4. Point Stripe at `https://<backend>/webhooks/payment`, store the signing secret in Key Vault / `config.env`, redeploy backend.
-
-Scripts: [`deploy/azure/`](deploy/azure/). CI: [`.github/workflows/azure-container-apps.yml`](.github/workflows/azure-container-apps.yml).
-
-### Browser (Azure Portal) quick path
-
-1. Portal → create Resource Group + Container Registry + PostgreSQL Flexible Server + Key Vault.  
-2. Open **Cloud Shell**, clone the repo, fill `deploy/azure/config.env`, run the same `bootstrap` / `06`–`08` scripts above.  
-3. Apps appear under **Container Apps**; open the frontend FQDN in the browser.
-
-### Local production-image smoke test
-
-```bash
-export JWT_SECRET_KEY="replace-with-long-random-secret"
-export OPENAI_API_KEY="sk-..."
-docker compose -f docker-compose.prod.yml up --build
-```
-
-- API: `http://localhost:8080` (`/actuator/health`)
-- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
-- Web: `http://localhost:3000`
-
-Dockerfiles: [`Dockerfile.backend`](Dockerfile.backend), [`frontend/Dockerfile`](frontend/Dockerfile).
-
----
-
-## 📈 Roadmap & Progress
-- [x] **Auth & RBAC**: JWT login/signup with project-level permissions.
-- [x] **Project Management**: Project creation, deletion, and dashboard UI.
-- [x] **AI App Generator**: SSE streaming code generation with file tree persistence.
-- [x] **Sandpack Sandbox**: Live execution of React/Next.js files in-browser.
-- [x] **Stripe Integration**: Plan seeding, checkout redirects, and portal management.
-- [x] **Usage Guardrails**: Token quotas and active preview limits.
-- [x] **Team Collaboration**: Invite system with Owner, Editor, Viewer roles.
-- [x] **📱 Android Mobile Client**: Native Android application for AuraCode with live previews, full project editing, and checkout integration.
-- [ ] **One-Click Deployments**: Direct deployment of generated apps to Vercel/Netlify.
-
----
-
-## 📱 Native Android Mobile Client
-
-To extend AuraCode to mobile environments, the **AuraCode Android Client** provides a fully native experience built from the ground up with Kotlin and Jetpack Compose.
-
-### Key Features:
-* **Mobile Workspace**: Prompt and preview your web applications directly on your phone or tablet.
-* **In-App Sandpack WebView Preview**: Render dynamically generated React, Next.js, and HTML projects client-side in an interactive mobile preview component.
-* **Stripe Checkout Web Interface**: Seamlessly upgrade plans and purchase tokens directly from within the app.
-* **Hilt Dependency Injection**: Modular architecture using Hilt, Retrofit, KotlinX Serialization, OkHttp, and Coroutines.
-
-<div align="center">
-  <img src="docs/assets/android-preview.png" alt="AuraCode Android App Preview" width="320" style="border-radius: 20px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
-  <p><i>Sleek mobile dashboard and code preview generator (Fully Implemented)</i></p>
-</div>
-
 ---
 
 ## 🔗 Project Info & License
-- **Repository:** [Snehil208001/Lovable_Clone](https://github.com/Snehil208001/Lovable_Clone)
-- **License:** Educational and personal use only.
-
+- **GitHub Repository:** [Snehil208001/Lovable_Clone](https://github.com/Snehil208001/Lovable_Clone)
+- **Author:** Snehil ([snehil@gmail.com](mailto:snehil@gmail.com))
+- **License:** Educational and personal portfolio use only.

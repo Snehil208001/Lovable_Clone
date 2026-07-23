@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import javax.crypto.Mac;
@@ -49,7 +50,7 @@ public class CashfreePaymentService {
     @Value("${cashfree.secret-key:}")
     private String secretKey;
 
-    @Value("${cashfree.env:PRODUCTION}")
+    @Value("${cashfree.env:SANDBOX}")
     private String env;
 
     @Value("${cashfree.notify-url:}")
@@ -92,6 +93,10 @@ public class CashfreePaymentService {
                 "plan_id", plan.getId().toString()
         ));
 
+        String mode = resolvedMode();
+        log.info("Cashfree create order env={} baseUrl={} orderId={} amountInr={}",
+                mode, baseUrl(), orderId, plan.getAmountInr());
+
         try {
             JsonNode response = restClient().post()
                     .uri("/orders")
@@ -103,11 +108,18 @@ public class CashfreePaymentService {
             if (response == null || !response.hasNonNull("payment_session_id")) {
                 throw new BadRequestException("Cashfree did not return a payment session");
             }
-            String mode = "SANDBOX".equalsIgnoreCase(env.trim()) ? "sandbox" : "production";
             return CheckoutResponse.cashfree(response.get("payment_session_id").asText(), mode);
+        } catch (BadRequestException e) {
+            throw e;
         } catch (RestClientResponseException e) {
-            log.error("Cashfree create order failed: {}", e.getResponseBodyAsString());
-            throw new BadRequestException("Cashfree rejected checkout: " + shortCashfreeError(e));
+            log.error("Cashfree create order failed status={} body={}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BadRequestException("Cashfree rejected checkout (" + mode + "): " + shortCashfreeError(e));
+        } catch (RestClientException e) {
+            log.error("Cashfree create order transport error env={}", mode, e);
+            throw new BadRequestException("Cashfree checkout unreachable (" + mode + "): " + e.getMessage());
+        } catch (Exception e) {
+            log.error("Cashfree create order unexpected error env={}", mode, e);
+            throw new BadRequestException("Cashfree checkout failed (" + mode + "): " + e.getMessage());
         }
     }
 
@@ -190,8 +202,9 @@ public class CashfreePaymentService {
     }
 
     private Map<String, Object> buildOrderMeta(String orderId) {
+        String base = StringUtils.hasText(frontendUrl) ? frontendUrl.trim() : "http://localhost:5173";
         Map<String, Object> meta = new LinkedHashMap<>();
-        meta.put("return_url", frontendUrl + "/billing?status=success&order_id=" + orderId);
+        meta.put("return_url", base + "/billing?status=success&order_id=" + orderId);
         if (StringUtils.hasText(notifyUrl)) {
             meta.put("notify_url", notifyUrl.trim());
         }
@@ -209,9 +222,17 @@ public class CashfreePaymentService {
     }
 
     private String baseUrl() {
-        return "SANDBOX".equalsIgnoreCase(env.trim())
+        return "sandbox".equals(resolvedMode())
                 ? "https://sandbox.cashfree.com/pg"
                 : "https://api.cashfree.com/pg";
+    }
+
+    /** sandbox | production — null/blank env treated as sandbox (test keys are common during setup). */
+    private String resolvedMode() {
+        if (!StringUtils.hasText(env) || "SANDBOX".equalsIgnoreCase(env.trim())) {
+            return "sandbox";
+        }
+        return "production";
     }
 
     private void requireConfigured() {

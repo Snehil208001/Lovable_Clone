@@ -4,6 +4,7 @@ import com.snehil.project.lovable_clone.dto.subscriptions.PlanResponse;
 import com.snehil.project.lovable_clone.dto.subscriptions.SubscriptionResponse;
 import com.snehil.project.lovable_clone.entity.Plan;
 import com.snehil.project.lovable_clone.entity.Subscription;
+import com.snehil.project.lovable_clone.enums.SubscriptionStatus;
 import com.snehil.project.lovable_clone.service.impl.StripePriceResolver;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -18,6 +19,9 @@ public abstract class SubscriptionMapper {
     @Autowired
     protected StripePriceResolver stripePriceResolver;
 
+    @Mapping(target = "status", source = "status", qualifiedByName = "statusName")
+    @Mapping(target = "currentPeriod", source = "currentPeriodEnd")
+    @Mapping(target = "tokensUsedThisCycle", constant = "0L")
     public abstract SubscriptionResponse toSubscriptionResponse(Subscription subscription);
 
     @Mapping(target = "price", source = "stripePriceId", qualifiedByName = "displayAmount")
@@ -26,5 +30,10 @@ public abstract class SubscriptionMapper {
     @Named("displayAmount")
     protected String displayAmount(String stripePriceId) {
         return stripePriceResolver.displayAmount(stripePriceId);
+    }
+
+    @Named("statusName")
+    protected String statusName(SubscriptionStatus status) {
+        return status == null ? null : status.name();
     }
 }
