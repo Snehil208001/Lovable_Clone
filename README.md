@@ -26,8 +26,27 @@
 The **AuraCode Android Client** is a feature-rich, production-grade native Android app built using **Kotlin**, **Jetpack Compose**, and **Clean Architecture + MVVM**. It allows users to write prompts, stream AI code generation in real-time, view dynamic project file trees, compile React/HTML templates on-device in an interactive WebView, and manage subscriptions.
 
 <div align="center">
-  <img src="docs/assets/android-preview.png" alt="AuraCode Android App Preview" width="340" style="border-radius: 20px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);" />
-  <p><i>Native Jetpack Compose UI: Dashboard, Code Explorer, Real-time SSE Chat & On-Device Sandpack Web Preview</i></p>
+  <table>
+    <tr>
+      <td align="center" width="25%">
+        <img src="docs/assets/android-dashboard.jpg" alt="Native Android Dashboard" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" /><br/>
+        <sub><b>1. Mobile Dashboard</b></sub>
+      </td>
+      <td align="center" width="25%">
+        <img src="docs/assets/android-chat.jpg" alt="Real-Time AI Chat" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" /><br/>
+        <sub><b>2. SSE Streaming AI Chat</b></sub>
+      </td>
+      <td align="center" width="25%">
+        <img src="docs/assets/android-code.jpg" alt="Mobile Code Explorer" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" /><br/>
+        <sub><b>3. File Tree & Code View</b></sub>
+      </td>
+      <td align="center" width="25%">
+        <img src="docs/assets/android-preview.jpg" alt="On-Device Sandpack Preview" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" /><br/>
+        <sub><b>4. On-Device Web Preview</b></sub>
+      </td>
+    </tr>
+  </table>
+  <p><i>Full Mobile User Flow: Project Dashboard → SSE Code Generation → Source File Tree → On-Device Sandpack Compilation</i></p>
 </div>
 
 ---
